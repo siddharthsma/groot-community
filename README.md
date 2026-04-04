@@ -1,36 +1,82 @@
 # Groot Community Bundle
 
-This directory is the canonical Community self-hosted bundle in the main Groot
-repo.
+This directory is the canonical self-hosted Community deployment bundle for
+Groot.
 
-It is intended to be mirrored later into a small public Community deploy repo,
-but this in-repo copy is the source of truth for:
+It is intended to be mirrored into the public `groot-community` repo, but this
+copy in the main repo is the source of truth.
+
+## What it includes
 
 - `docker-compose.yml`
 - `.env.example`
 - `setup-community.sh`
 - `groot`
 - `migrations/`
-- Community install and upgrade docs
+- `UPGRADE.md`
 
-This bundle is edition-stamped for Community deployment. Changing `.env` does
-not convert it into Cloud or Internal mode.
+## What it is for
 
-## What this bundle expects
+Use this bundle when you want to run Groot Community Edition as a
+single-tenant self-hosted stack.
 
-The bundle is image-based:
+It is not the same as the root development stack used by `make up`.
 
-- `GROOT_API_IMAGE`
-- `AGENT_RUNTIME_IMAGE`
-- `AI_GATEWAY_IMAGE`
+## Quick Start
 
-In this private source repo, `.env.example` points at local release-style image
-names so the bundle can be validated in-place. A public Community mirror should
-replace those values with published versioned registry tags for each release.
+```sh
+./groot setup
+./groot start
+./groot migrate
+```
 
-## Repo-local validation flow
+Then open:
 
-To validate the Community bundle directly from this repo:
+- API: `http://localhost:8080`
+- AI Gateway: `http://localhost:8787`
+- Agent runtime: `http://localhost:8090`
+- Temporal UI: `http://localhost:8233`
+
+## Operator Commands
+
+```sh
+./groot setup
+./groot start
+./groot stop
+./groot restart
+./groot status
+./groot logs
+./groot migrate
+```
+
+## Configuration
+
+Copy or generate `.env` from `.env.example`.
+
+The most important settings are:
+
+- image references:
+  - `GROOT_API_IMAGE`
+  - `AGENT_RUNTIME_IMAGE`
+  - `AI_GATEWAY_IMAGE`
+- public runtime settings:
+  - `GROOT_PUBLIC_BASE_URL`
+  - `COMMUNITY_TENANT_NAME`
+  - `GROOT_HTTP_PORT`
+- optional provider keys:
+  - `OPENAI_API_KEY`
+  - `ANTHROPIC_API_KEY`
+  - `GROQ_API_KEY`
+  - `RESEND_API_KEY`
+  - `SLACK_SIGNING_SECRET`
+
+`./groot setup` will generate safe defaults for secrets if placeholder values
+are still present.
+
+## Repo-local validation
+
+When validating this bundle inside the private source repo, first build the
+local release-style images:
 
 ```sh
 ./scripts/build-community-images.sh
@@ -40,77 +86,14 @@ cd deploy/docker-compose/community
 ./groot migrate
 ```
 
-That flow builds local Community images, configures `.env`, starts the stack,
-and applies the bundle-local SQL migrations.
+## Notes
 
-## Operator commands
+- Community Edition is edition-stamped for single-tenant use.
+- Changing `.env` does not convert this bundle into Cloud or Internal mode.
+- The bundle runs the same normal runtime boundary as the main product:
+  Groot API, agent runtime, and AI gateway work together as separate services.
 
-The Community operator interface is:
+## More
 
-```sh
-./groot setup
-./groot start
-./groot migrate
-./groot status
-./groot logs
-./groot stop
-```
-
-### `./groot setup`
-
-This command:
-
-- checks Docker and Docker Compose
-- creates `.env` from `.env.example` if needed
-- prompts for the minimum required values
-- generates safe defaults for secrets if placeholders are still present
-
-### `./groot start`
-
-Starts the Community stack in detached mode.
-
-### `./groot migrate`
-
-Applies every SQL file in `./migrations/` to the bundle’s Postgres container.
-
-### `./groot status`
-
-Shows container status for the Community stack.
-
-### `./groot logs`
-
-Tails logs for the Community stack or a named service.
-
-### `./groot stop`
-
-Stops and removes the Community stack containers.
-
-## Default endpoints
-
-- API: `http://localhost:8080`
-- AI Gateway: `http://localhost:8787`
-- Agent runtime: `http://localhost:8090`
-- Temporal frontend: `localhost:7233`
-- Temporal UI: `http://localhost:8233`
-
-## Notes for public mirroring
-
-When this bundle is mirrored into a public Community deploy repo:
-
-- keep the same helper command UX
-- replace local image names with published release image tags
-- keep `migrations/` bundled with the release
-- keep `.env.example` as the canonical Community env template
-
-In the private source repo, that mirroring is now automated by the
-tag-triggered Community release workflow. Maintainer steps live in
-[community-release-process.md](/Users/siddharthsameerambegaonkar/Desktop/Code/groot/docs/community-release-process.md).
-
-## Supported runtime boundary
-
-This bundle includes the same normal runtime posture as the main product:
-
-- Groot Go code calls the agent runtime over HTTP
-- the agent runtime owns model execution
-- the agent runtime uses AI Gateway for model access when gateway mode is enabled
-- the runtime uses Groot’s internal tool endpoints for outbound actions and wait tools
+- Upgrade guidance: [UPGRADE.md](/Users/siddharthsameerambegaonkar/Desktop/Code/groot/deploy/docker-compose/community/UPGRADE.md)
+- Maintainer release flow: [community-release-process.md](/Users/siddharthsameerambegaonkar/Desktop/Code/groot/docs/community-release-process.md)
