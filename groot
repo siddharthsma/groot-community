@@ -15,7 +15,7 @@ require_docker_compose() {
 
 ensure_env() {
   if [[ ! -f "$ENV_FILE" ]]; then
-    echo "Missing $ENV_FILE. Run ./groot setup first." >&2
+    echo "Missing $ENV_FILE. Run ./setup-community.sh first." >&2
     exit 1
   fi
 }
@@ -39,7 +39,7 @@ run_migrations() {
 
 show_help() {
   cat <<'EOF'
-Usage: ./groot <command>
+Usage: groot <command>
 
 Commands:
   setup [--non-interactive]  Configure .env for the Community bundle

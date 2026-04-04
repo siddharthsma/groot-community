@@ -1,8 +1,6 @@
 # Upgrading Groot Community
 
-This Community bundle is intended to be mirrored into a small public deploy
-repo later. In this source repo, the same bundle is kept as the canonical
-source of truth.
+Use this guide when upgrading an existing Groot Community installation.
 
 ## Upgrade flow
 
@@ -13,29 +11,23 @@ source of truth.
 5. Apply the SQL migrations.
 6. Verify the stack is healthy.
 
-## Repo-local validation flow
+## If You Are Running From Source Locally
 
-If you are validating the Community bundle directly from this private source
-repo, you can rebuild the local images first:
+If you are running the Community bundle directly from source instead of
+published images, rebuild the local images first:
 
 ```sh
 ./scripts/build-community-images.sh
 cd deploy/docker-compose/community
-./groot restart
-./groot migrate
+groot restart
+groot migrate
 ```
-
-## Public mirror flow
-
-When this bundle is mirrored into a public Community deploy repo, the same
-operator flow should apply, but the image names in `.env` should point to
-published registry tags instead of local image names.
 
 ## Post-upgrade checks
 
 After upgrading:
 
-- run `./groot status`
-- review `./groot logs`
-- open the API and UI
+- run `groot status`
+- review `groot logs`
+- check the API and Temporal UI
 - verify the expected edition and tenancy mode in Settings or `/system/edition`

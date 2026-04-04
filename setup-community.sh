@@ -4,6 +4,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
 ENV_FILE="$SCRIPT_DIR/.env"
+PROFILE_FILE=""
+PATH_EXPORT_LINE="export PATH=\"$SCRIPT_DIR:\$PATH\""
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
+MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
 
 NON_INTERACTIVE=0
 if [[ "${1:-}" == "--non-interactive" ]]; then
@@ -21,6 +25,73 @@ require_docker_compose() {
   if ! docker compose version >/dev/null 2>&1; then
     echo "Docker Compose is required." >&2
     exit 1
+  fi
+}
+
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+wait_for_postgres() {
+  local attempts=0
+  until compose exec -T postgres pg_isready -U groot -d groot >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ "$attempts" -ge 60 ]]; then
+      echo "Postgres did not become ready in time." >&2
+      exit 1
+    fi
+    sleep 2
+  done
+}
+
+run_migrations() {
+  if [[ ! -d "$MIGRATIONS_DIR" ]]; then
+    echo "Missing migrations directory: $MIGRATIONS_DIR" >&2
+    exit 1
+  fi
+
+  while IFS= read -r file; do
+    compose exec -T postgres psql -U groot -d groot < "$file"
+  done < <(find "$MIGRATIONS_DIR" -type f -name '*.sql' | sort)
+}
+
+detect_profile_file() {
+  local shell_name
+  shell_name="$(basename "${SHELL:-}")"
+
+  case "$shell_name" in
+    zsh)
+      PROFILE_FILE="${ZDOTDIR:-$HOME}/.zshrc"
+      ;;
+    bash)
+      if [[ -f "$HOME/.bashrc" || ! -f "$HOME/.bash_profile" ]]; then
+        PROFILE_FILE="$HOME/.bashrc"
+      else
+        PROFILE_FILE="$HOME/.bash_profile"
+      fi
+      ;;
+    *)
+      PROFILE_FILE="$HOME/.profile"
+      ;;
+  esac
+}
+
+ensure_path_install() {
+  detect_profile_file
+
+  if [[ ":$PATH:" != *":$SCRIPT_DIR:"* ]]; then
+    export PATH="$SCRIPT_DIR:$PATH"
+  fi
+
+  mkdir -p "$(dirname "$PROFILE_FILE")"
+  touch "$PROFILE_FILE"
+
+  if ! grep -Fqx "$PATH_EXPORT_LINE" "$PROFILE_FILE"; then
+    {
+      echo
+      echo "# Groot Community"
+      echo "$PATH_EXPORT_LINE"
+    } >>"$PROFILE_FILE"
   fi
 }
 
@@ -96,6 +167,7 @@ ensure_secret() {
 
 require_cmd docker
 require_docker_compose
+ensure_path_install
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cp "$ENV_EXAMPLE" "$ENV_FILE"
@@ -136,15 +208,25 @@ ensure_secret "AI_GATEWAY_API_KEY" "groot-ai-gateway-dev-key"
 ensure_secret "AI_GATEWAY_STATUS_AUTH_API_KEY" "ai-gateway-status-secret"
 ensure_secret "AGENT_RUNTIME_SHARED_SECRET" "agent-runtime-secret"
 
+echo "Starting Postgres for initial schema setup..."
+compose up -d postgres
+wait_for_postgres
+
+echo "Applying database migrations..."
+run_migrations
+
 cat <<EOF
 
 Community bundle configured.
 
-Next steps:
-  ./groot start
-  ./groot migrate
-  ./groot status
+The Groot command has been added to your PATH through:
+  $PROFILE_FILE
 
-When mirroring this bundle publicly, replace the default local image names in .env
-with the published release image tags for that version.
+Next steps:
+  1. Open a new terminal, or run:
+       source "$PROFILE_FILE"
+  2. Start Groot:
+       groot start
+  3. Check status:
+       groot status
 EOF
