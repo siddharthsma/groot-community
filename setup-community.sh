@@ -142,6 +142,78 @@ PY
   fi
 }
 
+generate_install_id() {
+  python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+}
+
+image_version() {
+  local key="$1"
+  local ref
+  ref="$(get_value "$key")"
+  if [[ -z "$ref" ]]; then
+    echo "unknown"
+    return
+  fi
+
+  local without_digest="${ref%@*}"
+  local tag="${without_digest##*:}"
+  if [[ "$tag" == "$without_digest" || -z "$tag" ]]; then
+    echo "unknown"
+    return
+  fi
+
+  echo "$tag"
+}
+
+telemetry_enabled() {
+  local value
+  value="$(get_value "GROOT_TELEMETRY_ENABLED")"
+  value="$(printf '%s' "${value:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" != "false" && "$value" != "0" && "$value" != "no" ]]
+}
+
+emit_telemetry_event() {
+  local event_name="$1"
+  if ! telemetry_enabled; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local install_id telemetry_base_url version platform arch
+  install_id="$(get_value "GROOT_INSTALL_ID")"
+  telemetry_base_url="$(get_value "GROOT_TELEMETRY_BASE_URL")"
+  version="$(image_version "GROOT_API_IMAGE")"
+  platform="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m | tr '[:upper:]' '[:lower:]')"
+
+  if [[ -z "$install_id" || "$install_id" == "community-install-id" || -z "$telemetry_base_url" ]]; then
+    return 0
+  fi
+
+  curl -fsS -X POST "${telemetry_base_url%/}/community/install-event" \
+    -H 'content-type: application/json' \
+    -d "$(python3 - <<'PY' "$install_id" "$event_name" "$version" "$platform" "$arch"
+import json
+import sys
+
+install_id, event_name, version, platform, arch = sys.argv[1:6]
+print(json.dumps({
+    "install_id": install_id,
+    "event": event_name,
+    "version": version,
+    "edition": "community",
+    "platform": platform,
+    "arch": arch,
+}))
+PY
+)" >/dev/null 2>&1 || true
+}
+
 prompt_value() {
   local key="$1"
   local prompt="$2"
@@ -213,6 +285,17 @@ ensure_master_key() {
   set_value "$key" "$current"
 }
 
+ensure_install_id() {
+  local key="$1"
+  local placeholder="$2"
+  local current
+  current="$(get_value "$key")"
+  if [[ -z "$current" || "$current" == "$placeholder" ]]; then
+    current="$(generate_install_id)"
+  fi
+  set_value "$key" "$current"
+}
+
 require_cmd docker
 require_docker_compose
 ensure_path_install
@@ -258,11 +341,18 @@ set_value "GROQ_API_KEY" "$groq_api_key"
 hf_token="$(prompt_value "HF_TOKEN" "Hugging Face token (optional)" "$(get_value "HF_TOKEN")")"
 set_value "HF_TOKEN" "$hf_token"
 
+ensure_install_id "GROOT_INSTALL_ID" "community-install-id"
 ensure_secret "GROOT_SYSTEM_API_KEY" "system-secret"
 ensure_master_key "GROOT_SECRETS_MASTER_KEY" "community-secrets-master-key"
 ensure_secret "AI_GATEWAY_API_KEY" "groot-ai-gateway-dev-key"
 ensure_secret "AI_GATEWAY_STATUS_AUTH_API_KEY" "ai-gateway-status-secret"
 ensure_secret "AGENT_RUNTIME_SHARED_SECRET" "agent-runtime-secret"
+
+telemetry_enabled_value="$(prompt_value "GROOT_TELEMETRY_ENABLED" "Enable anonymous Community telemetry" "$(get_value "GROOT_TELEMETRY_ENABLED")")"
+set_value "GROOT_TELEMETRY_ENABLED" "$telemetry_enabled_value"
+
+telemetry_base_url="$(prompt_value "GROOT_TELEMETRY_BASE_URL" "Telemetry base URL" "$(get_value "GROOT_TELEMETRY_BASE_URL")")"
+set_value "GROOT_TELEMETRY_BASE_URL" "$telemetry_base_url"
 
 echo "Starting Postgres for initial schema setup..."
 compose up -d postgres
@@ -270,6 +360,8 @@ wait_for_postgres
 
 echo "Applying database migrations..."
 run_migrations
+
+emit_telemetry_event "install_initialized"
 
 cat <<EOF
 

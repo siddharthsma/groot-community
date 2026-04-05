@@ -53,6 +53,70 @@ set_value() {
   mv "$tmp" "$ENV_FILE"
 }
 
+image_version_for_key() {
+  local key="$1"
+  local ref
+  ref="$(get_value "$key")"
+  if [[ -z "$ref" ]]; then
+    echo "unknown"
+    return
+  fi
+  local without_digest="${ref%@*}"
+  local tag="${without_digest##*:}"
+  if [[ "$tag" == "$without_digest" || -z "$tag" ]]; then
+    echo "unknown"
+    return
+  fi
+  echo "$tag"
+}
+
+telemetry_enabled() {
+  local value
+  value="$(get_value "GROOT_TELEMETRY_ENABLED")"
+  value="$(printf '%s' "${value:-}" | tr '[:upper:]' '[:lower:]')"
+  [[ "$value" != "false" && "$value" != "0" && "$value" != "no" ]]
+}
+
+emit_telemetry_event() {
+  ensure_env
+  if ! telemetry_enabled; then
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local event_name="$1"
+  local install_id telemetry_base_url version platform arch
+  install_id="$(get_value "GROOT_INSTALL_ID")"
+  telemetry_base_url="$(get_value "GROOT_TELEMETRY_BASE_URL")"
+  version="$(image_version_for_key "GROOT_API_IMAGE")"
+  platform="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m | tr '[:upper:]' '[:lower:]')"
+
+  if [[ -z "$install_id" || "$install_id" == "community-install-id" || -z "$telemetry_base_url" ]]; then
+    return 0
+  fi
+
+  curl -fsS -X POST "${telemetry_base_url%/}/community/install-event" \
+    -H 'content-type: application/json' \
+    -d "$(python3 - <<'PY' "$install_id" "$event_name" "$version" "$platform" "$arch"
+import json
+import sys
+
+install_id, event_name, version, platform, arch = sys.argv[1:6]
+print(json.dumps({
+    "install_id": install_id,
+    "event": event_name,
+    "version": version,
+    "edition": "community",
+    "platform": platform,
+    "arch": arch,
+}))
+PY
+)" >/dev/null 2>&1 || true
+}
+
 get_release_repository() {
   if [[ ! -f "$RELEASE_REPOSITORY_FILE" ]]; then
     echo "Missing $RELEASE_REPOSITORY_FILE. This Community bundle does not know which public release stream to use." >&2
@@ -208,6 +272,8 @@ show_update_check() {
   repo="$(get_release_repository)"
   current="$(installed_version)"
   latest="$(fetch_latest_release_version "$repo")"
+
+  emit_telemetry_event "update_check"
 
   echo "Installed version: $current"
   echo "Latest version:    $latest"

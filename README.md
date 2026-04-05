@@ -1,6 +1,7 @@
 # Groot (Community Edition)
 
 ![Groot Community banner](./groot-banner-1.png)
+![Community installs](https://img.shields.io/endpoint?url=https%3A%2F%2Ftelemetry.grootai.dev%2Fcommunity%2Fbadge%2Finstall-count)
 
 Groot (Community Edition) is the self-hosted, single-tenant edition of Groot.
 
@@ -104,6 +105,10 @@ The most important settings are:
   - `COMMUNITY_TENANT_NAME`
   - `GROOT_UI_PORT`
   - `GROOT_HTTP_PORT`
+- telemetry settings:
+  - `GROOT_INSTALL_ID`
+  - `GROOT_TELEMETRY_ENABLED`
+  - `GROOT_TELEMETRY_BASE_URL`
 - optional AI provider credentials:
   - `OPENAI_API_KEY`
   - `ANTHROPIC_API_KEY`
@@ -112,6 +117,12 @@ The most important settings are:
 
 Deployment-level AI provider credentials belong in `.env`. Connection-specific
 integration secrets do not belong in the basic install flow.
+
+Community telemetry is anonymous and can be disabled by setting:
+
+```env
+GROOT_TELEMETRY_ENABLED=false
+```
 
 ## Public API URL And Ingest Endpoint
 

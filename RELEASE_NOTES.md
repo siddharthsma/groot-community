@@ -1,11 +1,11 @@
-# Groot Community 0.1.4
+# Groot Community 0.1.5
 
 ## Published Images
 
-- `groot-community-api:0.1.4`
-- `groot-community-ui:0.1.4`
-- `groot-community-agent-runtime:0.1.4`
-- `groot-community-ai-gateway:0.1.4`
+- `groot-community-api:0.1.5`
+- `groot-community-ui:0.1.5`
+- `groot-community-agent-runtime:0.1.5`
+- `groot-community-ai-gateway:0.1.5`
 
 ## Install
 
@@ -26,4 +26,4 @@ groot update
 
 ## Changes
 
-- Ship Community UI bundle and self-update flow
+- Add Community install telemetry
