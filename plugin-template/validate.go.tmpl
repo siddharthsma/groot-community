@@ -1,0 +1,20 @@
+package main
+
+import (
+	"errors"
+	"strings"
+
+	sdkintegration "groot/sdk/integration"
+)
+
+func validateConnectionConfig(config map[string]any) error {
+	var decoded Config
+	if err := sdkintegration.DecodeInto(config, &decoded); err != nil {
+		return err
+	}
+	decoded.APIKey = strings.TrimSpace(decoded.APIKey)
+	if decoded.APIKey == "" {
+		return errors.New("config.api_key is required")
+	}
+	return sdkintegration.RewriteConfig(config, decoded)
+}

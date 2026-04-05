@@ -6,8 +6,10 @@ ENV_EXAMPLE="$SCRIPT_DIR/.env.example"
 ENV_FILE="$SCRIPT_DIR/.env"
 PROFILE_FILE=""
 PATH_EXPORT_LINE="export PATH=\"$SCRIPT_DIR:\$PATH\""
+GROOT_HOME_EXPORT_LINE="export GROOT_HOME=\"$SCRIPT_DIR\""
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
+INTEGRATIONS_DIR="$SCRIPT_DIR/integrations"
 
 NON_INTERACTIVE=0
 if [[ "${1:-}" == "--non-interactive" ]]; then
@@ -82,6 +84,7 @@ ensure_path_install() {
   if [[ ":$PATH:" != *":$SCRIPT_DIR:"* ]]; then
     export PATH="$SCRIPT_DIR:$PATH"
   fi
+  export GROOT_HOME="$SCRIPT_DIR"
 
   mkdir -p "$(dirname "$PROFILE_FILE")"
   touch "$PROFILE_FILE"
@@ -92,6 +95,138 @@ ensure_path_install() {
       echo "# Groot Community"
       echo "$PATH_EXPORT_LINE"
     } >>"$PROFILE_FILE"
+  fi
+
+  local tmp
+  tmp="$(mktemp)"
+  awk -v line="$GROOT_HOME_EXPORT_LINE" '
+    BEGIN { updated = 0 }
+    /^export GROOT_HOME=/ {
+      print line
+      updated = 1
+      next
+    }
+    { print }
+    END {
+      if (!updated) {
+        print ""
+        print line
+      }
+    }
+  ' "$PROFILE_FILE" >"$tmp"
+  mv "$tmp" "$PROFILE_FILE"
+}
+
+ensure_integration_runtime_files() {
+  mkdir -p "$INTEGRATIONS_DIR/plugins" "$INTEGRATIONS_DIR/cache"
+
+  if [[ ! -f "$INTEGRATIONS_DIR/installed.json" ]]; then
+    cat >"$INTEGRATIONS_DIR/installed.json" <<'EOF'
+{
+  "integrations": []
+}
+EOF
+  fi
+
+  if [[ ! -f "$INTEGRATIONS_DIR/trusted_keys.json" ]]; then
+    cat >"$INTEGRATIONS_DIR/trusted_keys.json" <<'EOF'
+{
+  "trusted_publishers": []
+}
+EOF
+  fi
+
+  if [[ ! -f "$INTEGRATIONS_DIR/first_party_plugins.json" ]]; then
+    cat >"$INTEGRATIONS_DIR/first_party_plugins.json" <<'EOF'
+{
+  "plugins": [
+    {
+      "name": "asana",
+      "artifact": "asana.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "clickup",
+      "artifact": "clickup.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "http",
+      "artifact": "http.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "hubspot",
+      "artifact": "hubspot.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "notion",
+      "artifact": "notion.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "pipedrive",
+      "artifact": "pipedrive.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "resend",
+      "artifact": "resend.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "salesforce",
+      "artifact": "salesforce.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "shopify",
+      "artifact": "shopify.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "slack",
+      "artifact": "slack.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "stripe",
+      "artifact": "stripe.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    },
+    {
+      "name": "trello",
+      "artifact": "trello.so",
+      "version": "dev",
+      "publisher": "groot",
+      "sha256": ""
+    }
+  ]
+}
+EOF
   fi
 }
 
@@ -299,6 +434,7 @@ ensure_install_id() {
 require_cmd docker
 require_docker_compose
 ensure_path_install
+ensure_integration_runtime_files
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cp "$ENV_EXAMPLE" "$ENV_FILE"
@@ -369,6 +505,9 @@ Community bundle configured.
 
 The Groot command has been added to your PATH through:
   $PROFILE_FILE
+
+GROOT_HOME now points at:
+  $SCRIPT_DIR
 
 Next steps:
   1. Open a new terminal, or run:

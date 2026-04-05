@@ -163,6 +163,11 @@ services:
       GRAPH_EXECUTION_MAX_DEPTH: 25
       GRAPH_DEFAULT_LIMIT: 500
       GROOT_PUBLIC_BASE_URL: ${GROOT_PUBLIC_BASE_URL}
+      GROOT_INTEGRATION_PLUGIN_DIR: /app/integrations/plugins
+      GROOT_INTEGRATION_FIRST_PARTY_PLUGINS_PATH: /app/integrations/first_party_plugins.json
+      GROOT_INTEGRATION_INSTALLED_PATH: /app/integrations/installed.json
+      GROOT_INTEGRATION_TRUSTED_KEYS_PATH: /app/integrations/trusted_keys.json
+      GROOT_INTEGRATION_CACHE_DIR: /app/integrations/cache
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_API_BASE_URL: https://api.openai.com/v1
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
@@ -187,6 +192,8 @@ services:
       DELIVERY_MAX_ATTEMPTS: 10
       DELIVERY_INITIAL_INTERVAL: 2s
       DELIVERY_MAX_INTERVAL: 5m
+    volumes:
+      - ./integrations:/app/integrations
     ports:
       - "${GROOT_HTTP_PORT:-8080}:8080"
 

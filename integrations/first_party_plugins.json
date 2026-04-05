@@ -1,0 +1,88 @@
+{
+  "plugins": [
+    {
+      "name": "asana",
+      "artifact": "asana.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "6b535331c744be59857892f2620d0dba94a0a35faedb27db26db5ed6973dc95e"
+    },
+    {
+      "name": "clickup",
+      "artifact": "clickup.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "98cabf19a77547ff4b9c476d1db4069785fc58c0e9246f80213fcb4cbf00b3bc"
+    },
+    {
+      "name": "http",
+      "artifact": "http.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "839f4aa0145fef746c0925a3af5de3e43eeff44120f0653bfa2180d6611a4720"
+    },
+    {
+      "name": "hubspot",
+      "artifact": "hubspot.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "daa603b9c4ae61d15a0794c0389e27b58a8e8a214bd73a6dd1af6012ccbb2c34"
+    },
+    {
+      "name": "notion",
+      "artifact": "notion.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "9902191bc5e5f05a1a7ff6c1cd494a67b9ba2e1a1be2b45fbc3fdfee79f5b5b0"
+    },
+    {
+      "name": "pipedrive",
+      "artifact": "pipedrive.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "1931c13032944a6e8681be2531f39013ecbb3eda6ae6bda948a491e5913d711b"
+    },
+    {
+      "name": "resend",
+      "artifact": "resend.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "a125d18481d9715fe4a54dcb99069577aec13408c6b768e282773790d396bf0d"
+    },
+    {
+      "name": "salesforce",
+      "artifact": "salesforce.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "0b9164b83b3c6e3cb1e3819f7a5864bf86c679807e98503ea3d376bd936e55f7"
+    },
+    {
+      "name": "shopify",
+      "artifact": "shopify.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "146ae70e02326684620b3a46b9fccf5032bc35e3ac63b4ca46104e1dde41a87b"
+    },
+    {
+      "name": "slack",
+      "artifact": "slack.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "071074df368b5080a94bc42f934eafad450f04f68df8065508e03a9794a6ffc6"
+    },
+    {
+      "name": "stripe",
+      "artifact": "stripe.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "f8f9a7feda3b50668c0cd512add15b0f1e93ec919b219a6f8d04596b50061a15"
+    },
+    {
+      "name": "trello",
+      "artifact": "trello.so",
+      "version": "0.1.6",
+      "publisher": "groot",
+      "sha256": "405e8eea26ccb755db13a410f6d3e6a0cc216a2aad9fd6849cd0c80773f75591"
+    }
+  ]
+}

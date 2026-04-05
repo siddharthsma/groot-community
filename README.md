@@ -71,6 +71,7 @@ This value is used to generate the ingest endpoint shown in `Settings -> General
 - generates internal secrets
 - optionally stores AI provider credentials
 - adds this bundle directory to your shell `PATH`
+- exports `GROOT_HOME` so plugin build commands can target this bundle later
 - starts Postgres
 - applies the bundled database migrations
 - leaves Groot ready to start with the browser UI as the main entry point
@@ -86,6 +87,9 @@ After setup, use the `groot` command directly.
 - `groot status` shows current container status
 - `groot logs` tails logs for the whole stack or one service
 - `groot migrate` reapplies the bundled SQL migrations
+- `groot integration init` scaffolds a standalone integration plugin repository
+- `groot integration build` builds a local plugin repo into this Community bundle
+- `groot integration verify` checks shipped and local plugin artifacts for this bundle
 - `groot update --check` shows your installed version and the latest Community release
 - `groot update` upgrades the bundle to the latest Community release
 
@@ -123,6 +127,49 @@ Community telemetry is anonymous and can be disabled by setting:
 ```env
 GROOT_TELEMETRY_ENABLED=false
 ```
+
+## Plugins
+
+The Community bundle is a runtime host for integration plugins.
+
+- runtime plugin artifacts live in `integrations/plugins/`
+- shipped first-party plugin expectations live in
+  `integrations/first_party_plugins.json`
+- official first-party integrations are shipped that way too; Resend and Slack
+  are the first shipped examples
+- those shipped first-party artifacts are required for the Community runtime;
+  missing or broken official plugin artifacts now fail fast during startup
+- plugin source code should live in its own repository, not inside the
+  Community bundle
+- `GROOT_HOME` points at this bundle root after setup, so local plugin builds
+  can install directly into this runtime
+- `groot integration verify` runs the actual `groot-api` plugin verifier inside
+  the configured Community API image, so it checks the same Linux/runtime path
+  the stack will use at startup
+- shipped first-party plugin metadata includes version, publisher, and sha256
+  provenance in `integrations/first_party_plugins.json`
+
+Typical workflow:
+
+```sh
+mkdir -p ~/Desktop/Code/my-crm-groot-plugin
+cd ~/Desktop/Code/my-crm-groot-plugin
+groot integration init my_crm
+groot integration build .
+groot integration verify
+
+cd "$GROOT_HOME"
+groot restart
+```
+
+Once the stack restarts, the new integration appears in the catalog like any
+other provider. `groot integration build` produces Linux-compatible `.so`
+artifacts for the Dockerized Community API runtime, even if you run it from a
+non-Linux host. Official shipped first-party plugin artifacts are versioned
+alongside the Community release and verified against the bundle metadata before
+startup.
+
+For a fuller walkthrough, see [PLUGIN_DEVELOPMENT.md](./PLUGIN_DEVELOPMENT.md).
 
 ## Public API URL And Ingest Endpoint
 

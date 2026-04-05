@@ -6,6 +6,12 @@ COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 ENV_FILE="$SCRIPT_DIR/.env"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
 RELEASE_REPOSITORY_FILE="$SCRIPT_DIR/RELEASE_REPOSITORY"
+INTEGRATION_TOOLS_FILE="$SCRIPT_DIR/lib/integration-tools.sh"
+
+if [[ -f "$INTEGRATION_TOOLS_FILE" ]]; then
+  # shellcheck source=/dev/null
+  source "$INTEGRATION_TOOLS_FILE"
+fi
 
 require_docker_compose() {
   if ! docker compose version >/dev/null 2>&1; then
@@ -420,6 +426,9 @@ Commands:
   status                     Show Community stack status
   logs [service]             Tail logs for all services or one service
   migrate                    Apply SQL migrations from the bundle
+  integration init <name>    Scaffold a standalone integration plugin repository
+  integration build          Build a local plugin repo into the Community bundle
+  integration verify         Verify shipped and local plugin artifacts for this bundle
   update --check             Show installed and latest available Community versions
   update [--yes]             Update to the latest Community release
   help                       Show this help text
@@ -461,6 +470,13 @@ case "$cmd" in
     ;;
   migrate)
     run_migrations
+    ;;
+  integration)
+    if ! declare -f handle_integration_command >/dev/null 2>&1; then
+      echo "Integration tooling is unavailable in this bundle." >&2
+      exit 1
+    fi
+    handle_integration_command "$@"
     ;;
   update)
     case "${1:-}" in

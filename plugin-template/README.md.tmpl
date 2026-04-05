@@ -1,0 +1,37 @@
+# __DISPLAY_NAME__ Groot Plugin
+
+This repository contains a standalone Groot integration plugin for `__INTEGRATION_NAME__`.
+
+## Build
+
+Use the Groot Community bundle you want to test against:
+
+```sh
+groot integration build .
+```
+
+The build command uses `GROOT_HOME` by default and installs the compiled `.so`
+into `$GROOT_HOME/integrations/plugins/`.
+
+## Test locally
+
+1. Build the plugin:
+
+   ```sh
+   groot integration build .
+   ```
+
+2. Restart Groot:
+
+   ```sh
+   cd "$GROOT_HOME"
+   groot restart
+   ```
+
+3. Open the Groot UI and create a connection for `__INTEGRATION_NAME__`.
+
+## Next steps
+
+- update the manifest metadata in `provider.go`
+- replace the sample operation logic in `operations.go`
+- add inbound or setup action support if your integration needs it

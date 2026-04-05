@@ -1,0 +1,86 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	sdkintegration "groot/sdk/integration"
+)
+
+const integrationName = "__INTEGRATION_NAME__"
+
+type __STRUCT_NAME__Integration struct{}
+
+var Integration sdkintegration.IntegrationPlugin = &__STRUCT_NAME__Integration{}
+
+func (__STRUCT_NAME__Integration) Manifest() sdkintegration.Manifest {
+	return sdkintegration.Manifest{
+		Name:                integrationName,
+		Summary:             "__DISPLAY_NAME__ integration plugin.",
+		Category:            "Developer Tools",
+		Availability:        sdkintegration.AvailabilityAvailable,
+		SupportsTenantScope: true,
+		SupportsGlobalScope: false,
+		Publisher:           "Replace Me",
+		Version:             "0.1.0",
+		Schema: sdkintegration.ConnectionSchema{
+			Fields: []sdkintegration.ConnectionField{
+				{
+					Name:        "api_key",
+					Label:       "API key",
+					Description: "API key used by the integration.",
+					InputKind:   sdkintegration.InputKindPassword,
+					Required:    true,
+					Secret:      true,
+					Mutable:     true,
+				},
+			},
+		},
+		Operations: []sdkintegration.OperationSpec{
+			{
+				Name:             "ping",
+				Description:      "Execute a sample outbound operation.",
+				Summary:          "Run the sample ping operation.",
+				ParamsSchemaJSON: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"message":{"type":"string"}}}`),
+				ResultSchemaJSON: json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"message":{"type":"string"}},"required":["message"]}`),
+			},
+		},
+		Schemas: Schemas(),
+	}
+}
+
+func (__STRUCT_NAME__Integration) ValidateConnectionConfig(config map[string]any, defaults sdkintegration.ConnectionValidationContext) error {
+	return validateConnectionConfig(config)
+}
+
+func (__STRUCT_NAME__Integration) ExecuteOperation(_ context.Context, req sdkintegration.OperationRequest) (sdkintegration.OperationResult, error) {
+	if strings.TrimSpace(req.Operation) != "ping" {
+		return sdkintegration.OperationResult{}, fmt.Errorf("unsupported operation %s", req.Operation)
+	}
+
+	var cfg Config
+	if err := sdkintegration.DecodeInto(req.Config, &cfg); err != nil {
+		return sdkintegration.OperationResult{}, err
+	}
+
+	var params PingParams
+	if len(req.Params) > 0 {
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			return sdkintegration.OperationResult{}, fmt.Errorf("decode params: %w", err)
+		}
+	}
+
+	output, err := json.Marshal(map[string]any{
+		"message": strings.TrimSpace(params.Message),
+	})
+	if err != nil {
+		return sdkintegration.OperationResult{}, fmt.Errorf("marshal output: %w", err)
+	}
+
+	return sdkintegration.OperationResult{
+		StatusCode: 200,
+		Output:     output,
+	}, nil
+}

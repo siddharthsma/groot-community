@@ -1,0 +1,20 @@
+package main
+
+import sdkintegration "groot/sdk/integration"
+
+func Schemas() []sdkintegration.SchemaSpec {
+	return []sdkintegration.SchemaSpec{
+		{
+			EventType:  "__INTEGRATION_NAME__.ping.completed",
+			SourceKind: "internal",
+			SchemaJSON: sdkintegration.ResultEventSchema("__INTEGRATION_NAME__", "ping", true, sdkintegration.ObjectSchema(map[string]any{
+				"message": sdkintegration.StringSchema(),
+			}, false)),
+		},
+		{
+			EventType:  "__INTEGRATION_NAME__.ping.failed",
+			SourceKind: "internal",
+			SchemaJSON: sdkintegration.ResultEventSchema("__INTEGRATION_NAME__", "ping", false, nil),
+		},
+	}
+}
