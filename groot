@@ -5,10 +5,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 ENV_FILE="$SCRIPT_DIR/.env"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
+RELEASE_REPOSITORY_FILE="$SCRIPT_DIR/RELEASE_REPOSITORY"
 
 require_docker_compose() {
   if ! docker compose version >/dev/null 2>&1; then
     echo "Docker Compose is required." >&2
+    exit 1
+  fi
+}
+
+require_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "Missing required command: $1" >&2
     exit 1
   fi
 }
@@ -22,6 +30,303 @@ ensure_env() {
 
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
+
+get_value() {
+  local key="$1"
+  local line
+  line="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 || true)"
+  echo "${line#*=}"
+}
+
+set_value() {
+  local key="$1"
+  local value="$2"
+  local tmp
+  tmp="$(mktemp)"
+  awk -v key="$key" -v value="$value" -F= '
+    BEGIN { updated = 0 }
+    $1 == key { print key "=" value; updated = 1; next }
+    { print }
+    END { if (!updated) print key "=" value }
+  ' "$ENV_FILE" >"$tmp"
+  mv "$tmp" "$ENV_FILE"
+}
+
+get_release_repository() {
+  if [[ ! -f "$RELEASE_REPOSITORY_FILE" ]]; then
+    echo "Missing $RELEASE_REPOSITORY_FILE. This Community bundle does not know which public release stream to use." >&2
+    exit 1
+  fi
+
+  local repo
+  repo="$(tr -d '[:space:]' <"$RELEASE_REPOSITORY_FILE")"
+  if [[ -z "$repo" ]]; then
+    echo "Release repository metadata is empty: $RELEASE_REPOSITORY_FILE" >&2
+    exit 1
+  fi
+
+  echo "$repo"
+}
+
+extract_image_parts() {
+  local key="$1"
+  local expected_suffix="$2"
+  local ref
+  ref="$(get_value "$key")"
+  if [[ -z "$ref" ]]; then
+    echo "Missing $key in $ENV_FILE" >&2
+    exit 1
+  fi
+
+  local without_digest="${ref%@*}"
+  local repository="${without_digest%:*}"
+  local tag="${without_digest##*:}"
+  if [[ "$repository" == "$without_digest" || -z "$repository" || -z "$tag" ]]; then
+    echo "$key does not contain a version tag: $ref" >&2
+    exit 1
+  fi
+
+  if [[ "$repository" != *"/${expected_suffix}" && "$repository" != "$expected_suffix" ]]; then
+    echo "$key does not point to the expected image: $ref" >&2
+    exit 1
+  fi
+
+  if [[ ! "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+    echo "$key must use a version-pinned tag, not $tag" >&2
+    exit 1
+  fi
+
+  printf '%s\t%s\n' "$repository" "$tag"
+}
+
+installed_version() {
+  ensure_env
+
+  local api_parts ui_parts runtime_parts gateway_parts
+  local api_repo api_tag ui_repo ui_tag runtime_repo runtime_tag gateway_repo gateway_tag
+
+  api_parts="$(extract_image_parts "GROOT_API_IMAGE" "groot-community-api")"
+  ui_parts="$(extract_image_parts "GROOT_UI_IMAGE" "groot-community-ui")"
+  runtime_parts="$(extract_image_parts "AGENT_RUNTIME_IMAGE" "groot-community-agent-runtime")"
+  gateway_parts="$(extract_image_parts "AI_GATEWAY_IMAGE" "groot-community-ai-gateway")"
+
+  IFS=$'\t' read -r api_repo api_tag <<<"$api_parts"
+  IFS=$'\t' read -r ui_repo ui_tag <<<"$ui_parts"
+  IFS=$'\t' read -r runtime_repo runtime_tag <<<"$runtime_parts"
+  IFS=$'\t' read -r gateway_repo gateway_tag <<<"$gateway_parts"
+
+  if [[ "$api_tag" != "$ui_tag" || "$api_tag" != "$runtime_tag" || "$api_tag" != "$gateway_tag" ]]; then
+    cat >&2 <<EOF
+Community image versions are inconsistent in $ENV_FILE.
+  GROOT_API_IMAGE=$api_tag
+  GROOT_UI_IMAGE=$ui_tag
+  AGENT_RUNTIME_IMAGE=$runtime_tag
+  AI_GATEWAY_IMAGE=$gateway_tag
+
+Please correct the image tags before running an update.
+EOF
+    exit 1
+  fi
+
+  echo "$api_tag"
+}
+
+fetch_latest_release_version() {
+  require_cmd curl
+  require_cmd python3
+
+  local repo="$1"
+  local api_url="https://api.github.com/repos/${repo}/releases/latest"
+  local payload
+  if ! payload="$(curl -fsSL -H 'Accept: application/vnd.github+json' -H 'User-Agent: groot-community-bundle' "$api_url")"; then
+    echo "Failed to fetch latest Community release from $repo" >&2
+    exit 1
+  fi
+
+  RELEASE_JSON="$payload" python3 - <<'PY'
+import json
+import os
+import re
+import sys
+
+payload = os.environ.get("RELEASE_JSON", "")
+if not payload:
+    print("missing release payload", file=sys.stderr)
+    raise SystemExit(1)
+
+try:
+    release = json.loads(payload)
+except json.JSONDecodeError as exc:
+    print(f"invalid release payload: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+
+tag = str(release.get("tag_name", "")).strip()
+if not tag.startswith("v"):
+    print(f"unexpected release tag: {tag}", file=sys.stderr)
+    raise SystemExit(1)
+
+version = tag[1:]
+if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[.-][0-9A-Za-z.-]+)?", version):
+    print(f"unexpected release version: {version}", file=sys.stderr)
+    raise SystemExit(1)
+
+print(version)
+PY
+}
+
+verify_stack_health() {
+  ensure_env
+  require_cmd curl
+
+  local http_port ui_port
+  http_port="$(get_value "GROOT_HTTP_PORT")"
+  ui_port="$(get_value "GROOT_UI_PORT")"
+  http_port="${http_port:-8080}"
+  ui_port="${ui_port:-3000}"
+
+  local api_url="http://127.0.0.1:${http_port}/readyz"
+  local ui_url="http://127.0.0.1:${ui_port}/login"
+  local attempt
+
+  for attempt in {1..60}; do
+    if curl -fsS "$api_url" >/dev/null 2>&1 && curl -fsS "$ui_url" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Health verification failed." >&2
+  echo "  API: $api_url" >&2
+  echo "  UI:  $ui_url" >&2
+  exit 1
+}
+
+show_update_check() {
+  ensure_env
+  local repo current latest
+  repo="$(get_release_repository)"
+  current="$(installed_version)"
+  latest="$(fetch_latest_release_version "$repo")"
+
+  echo "Installed version: $current"
+  echo "Latest version:    $latest"
+  if [[ "$current" == "$latest" ]]; then
+    echo "Status: up to date"
+  else
+    echo "Status: update available"
+  fi
+}
+
+apply_update() {
+  local assume_yes="$1"
+  ensure_env
+  require_docker_compose
+
+  local repo current latest
+  repo="$(get_release_repository)"
+  current="$(installed_version)"
+  latest="$(fetch_latest_release_version "$repo")"
+
+  if [[ "$current" == "$latest" ]]; then
+    echo "Groot Community is already up to date at version $current."
+    return 0
+  fi
+
+  echo "Installed version: $current"
+  echo "Target version:    $latest"
+
+  if [[ "$assume_yes" != "1" ]]; then
+    local response
+    read -r -p "Proceed with update? [y/N]: " response
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+      echo "Update cancelled."
+      return 0
+    fi
+  fi
+
+  local api_repo ui_repo runtime_repo gateway_repo
+  IFS=$'\t' read -r api_repo _ <<<"$(extract_image_parts "GROOT_API_IMAGE" "groot-community-api")"
+  IFS=$'\t' read -r ui_repo _ <<<"$(extract_image_parts "GROOT_UI_IMAGE" "groot-community-ui")"
+  IFS=$'\t' read -r runtime_repo _ <<<"$(extract_image_parts "AGENT_RUNTIME_IMAGE" "groot-community-agent-runtime")"
+  IFS=$'\t' read -r gateway_repo _ <<<"$(extract_image_parts "AI_GATEWAY_IMAGE" "groot-community-ai-gateway")"
+
+  local backup_file="$ENV_FILE.bak.${current}.before-update"
+  cp "$ENV_FILE" "$backup_file"
+
+  local failed_step="rewrite image references"
+  set_value "GROOT_API_IMAGE" "${api_repo}:${latest}"
+  set_value "GROOT_UI_IMAGE" "${ui_repo}:${latest}"
+  set_value "AGENT_RUNTIME_IMAGE" "${runtime_repo}:${latest}"
+  set_value "AI_GATEWAY_IMAGE" "${gateway_repo}:${latest}"
+
+  failed_step="pull new images"
+  if ! compose pull; then
+    cat >&2 <<EOF
+Community update failed during: $failed_step
+Previous version: $current
+Target version:   $latest
+Backup file:      $backup_file
+
+If you need to recover, restore the previous image references from the backup file
+and rerun:
+  groot restart
+  groot migrate
+EOF
+    exit 1
+  fi
+
+  failed_step="restart Community stack"
+  if ! compose up -d; then
+    cat >&2 <<EOF
+Community update failed during: $failed_step
+Previous version: $current
+Target version:   $latest
+Backup file:      $backup_file
+
+If you need to recover, restore the previous image references from the backup file
+and rerun:
+  groot restart
+  groot migrate
+EOF
+    exit 1
+  fi
+
+  failed_step="apply migrations"
+  if ! run_migrations; then
+    cat >&2 <<EOF
+Community update failed during: $failed_step
+Previous version: $current
+Target version:   $latest
+Backup file:      $backup_file
+
+If you need to recover, restore the previous image references from the backup file
+and rerun:
+  groot restart
+  groot migrate
+EOF
+    exit 1
+  fi
+
+  failed_step="verify stack health"
+  if ! verify_stack_health; then
+    cat >&2 <<EOF
+Community update failed during: $failed_step
+Previous version: $current
+Target version:   $latest
+Backup file:      $backup_file
+
+If you need to recover, restore the previous image references from the backup file
+and rerun:
+  groot restart
+  groot migrate
+EOF
+    exit 1
+  fi
+
+  echo "Groot Community updated successfully."
+  echo "Version: $current -> $latest"
+  echo "Backup file: $backup_file"
 }
 
 run_migrations() {
@@ -49,6 +354,8 @@ Commands:
   status                     Show Community stack status
   logs [service]             Tail logs for all services or one service
   migrate                    Apply SQL migrations from the bundle
+  update --check             Show installed and latest available Community versions
+  update [--yes]             Update to the latest Community release
   help                       Show this help text
 EOF
 }
@@ -88,6 +395,24 @@ case "$cmd" in
     ;;
   migrate)
     run_migrations
+    ;;
+  update)
+    case "${1:-}" in
+      --check)
+        show_update_check
+        ;;
+      --yes)
+        apply_update 1
+        ;;
+      "")
+        apply_update 0
+        ;;
+      *)
+        echo "Unknown update option: $1" >&2
+        show_help >&2
+        exit 1
+        ;;
+    esac
     ;;
   help|-h|--help)
     show_help

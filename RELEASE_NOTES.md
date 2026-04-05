@@ -1,23 +1,29 @@
-# Groot Community 0.1.3
-
-This release was generated from private source tag `community-v0.1.3`.
+# Groot Community 0.1.4
 
 ## Published Images
 
-- `groot-community-api:0.1.3`
-- `groot-community-agent-runtime:0.1.3`
-- `groot-community-ai-gateway:0.1.3`
+- `groot-community-api:0.1.4`
+- `groot-community-ui:0.1.4`
+- `groot-community-agent-runtime:0.1.4`
+- `groot-community-ai-gateway:0.1.4`
 
 ## Install
 
 Use the helper commands in this repo:
 
 ```sh
-./groot setup
-./groot start
-./groot migrate
+./setup-community.sh
+source ~/.zshrc
+groot start
+```
+
+## Upgrading
+
+```sh
+groot update --check
+groot update
 ```
 
 ## Changes
 
-- Improve Community bundle setup flow
+- Ship Community UI bundle and self-update flow

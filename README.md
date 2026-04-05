@@ -1,67 +1,28 @@
-# Groot Community
+# Groot (Community Edition)
 
 ![Groot Community banner](./groot-banner-1.png)
 
-Groot Community is the self-hosted, single-tenant edition of Groot.
+Groot (Community Edition) is the self-hosted, single-tenant edition of Groot.
 
-Groot is an event hub for event-driven automation. It gives you one place to:
+Groot is an Agentic Integration Platform that lets you build, deploy, and
+orchestrate AI agents across your entire business.
 
-- receive events from external systems
-- normalize and store those events
-- route them to subscriptions and agents
-- track deliveries and retries
+It connects your apps, data, and workflows through a real-time event
+stream, while giving agents the ability to listen, decide, and act
+autonomously. With durable execution, deep observability, and built-in cost
+controls, Groot ensures every agent-driven process runs reliably at scale.
 
-This bundle is the packaged Community install for running Groot on your own
-machine or server with Docker Compose.
+In short: Groot is the operating system for AI agents, where integrations,
+automation, and intelligence come together to run your business.
 
-## Will This Work On A Fresh Machine?
+## Quick Start
 
-Yes, if you are using an official Community release bundle and you have Docker
-and Docker Compose installed.
-
-On a fresh machine:
-
-1. `./setup-community.sh` creates `.env`, generates internal secrets, and adds
-   this bundle directory to your shell `PATH`
-2. `./setup-community.sh` also starts Postgres and applies the bundled
-   database migrations
-3. `groot start` pulls the remaining images if needed and starts the full stack
-
-The first run may take a few minutes because Docker may need to download the
-images.
-
-## What You Get
-
-The Community stack includes:
-
-- Groot API
-- PostgreSQL
-- Kafka
-- Temporal
-- AI Gateway
-- agent runtime
-
-This bundle also includes:
-
-- `docker-compose.yml`
-- `.env.example`
-- `groot`
-- `migrations/`
-- `UPGRADE.md`
-
-## Before You Start
-
-You need:
+Requirements:
 
 - Docker
 - Docker Compose
-
-Optional but useful:
-
-- an OpenAI, Anthropic, Groq, or Hugging Face credential if you want to use
-  agent/model features immediately
-
-## Quick Start
+- a public HTTPS URL for the Groot API if external systems need to send events
+  into Groot
 
 From this directory:
 
@@ -73,80 +34,75 @@ groot start
 
 If you are using Bash, reload `~/.bashrc` or `~/.bash_profile` instead.
 
-Then open:
+The first run may take a few minutes because Docker may need to download the
+images.
 
+Endpoints:
+
+- UI: `http://localhost:3000`
 - API: `http://localhost:8080`
-- Temporal UI: `http://localhost:8233`
 
-If you are also running the full local development stack from the root repo,
-change the Community ports in `.env` first so the two stacks do not collide.
+## Before You Run Setup
 
-## What `setup-community.sh` does
+`./setup-community.sh` will ask for `GROOT_PUBLIC_BASE_URL`.
+
+Use the public API URL that external systems should call when sending events to
+Groot. Typical options are:
+
+- a reverse tunnel for local testing, such as ngrok or Cloudflare Tunnel
+- a public HTTPS reverse proxy or ingress in a longer-lived deployment
+
+Examples:
+
+```text
+https://abc123.ngrok.app
+https://groot-api.example.com
+```
+
+This value is used to generate the ingest endpoint shown in `Settings -> General`.
+
+## What The Setup Does
 
 `./setup-community.sh`:
 
-- checks Docker and Docker Compose
 - creates `.env` from `.env.example` if needed
 - asks for the minimum required settings
-- generates safe defaults for internal secrets
-- lets you optionally add AI provider credentials
-- adds the bundle directory to your shell `PATH`
-- starts Postgres and applies the bundled migrations
+- generates internal secrets
+- optionally stores AI provider credentials
+- adds this bundle directory to your shell `PATH`
+- starts Postgres
+- applies the bundled database migrations
+- leaves Groot ready to start with the browser UI as the main entry point
 
-The guided setup is the normal first step. After it has added the bundle
-directory to your `PATH`, you can also run the same flow again as:
-
-```sh
-groot setup
-```
+After setup, use the `groot` command directly.
 
 ## Commands
 
-- `groot setup`
-  Re-runs the guided setup flow and updates `.env`
-- `groot start`
-  Starts the Community stack in detached mode
-- `groot stop`
-  Stops and removes the Community stack containers
-- `groot restart`
-  Restarts the Community stack
-- `groot status`
-  Shows container status for the Community stack
-- `groot logs`
-  Tails logs for the whole stack or one named service
-- `groot migrate`
-  Re-applies the SQL migrations from the bundled `migrations/` directory
-
-## Why `groot migrate` Is Necessary
-
-The setup flow runs the initial migration automatically because Postgres starts
-empty.
-
-Groot does not create or evolve the database schema automatically at runtime.
-Instead, the supported setup is to apply the SQL migrations in the bundled
-`migrations/` directory.
-
-That means:
-
-- `./setup-community.sh` prepares the database schema on first install
-- `groot migrate` is still useful later for upgrades or manual reruns
-
-You should also run `groot migrate` after upgrading to a release that includes
-new migrations.
+- `groot setup` updates `.env` and reruns the guided setup flow
+- `groot start` starts the full Community stack
+- `groot stop` stops and removes the stack containers
+- `groot restart` restarts the stack
+- `groot status` shows current container status
+- `groot logs` tails logs for the whole stack or one service
+- `groot migrate` reapplies the bundled SQL migrations
+- `groot update --check` shows your installed version and the latest Community release
+- `groot update` upgrades the bundle to the latest Community release
 
 ## Configuration
 
-This bundle uses `.env` for deployment-level settings.
+This bundle uses `.env` for deployment-level configuration.
 
-The most important ones are:
+The most important settings are:
 
 - image references:
   - `GROOT_API_IMAGE`
+  - `GROOT_UI_IMAGE`
   - `AGENT_RUNTIME_IMAGE`
   - `AI_GATEWAY_IMAGE`
 - runtime settings:
   - `GROOT_PUBLIC_BASE_URL`
   - `COMMUNITY_TENANT_NAME`
+  - `GROOT_UI_PORT`
   - `GROOT_HTTP_PORT`
 - optional AI provider credentials:
   - `OPENAI_API_KEY`
@@ -154,25 +110,57 @@ The most important ones are:
   - `GROQ_API_KEY`
   - `HF_TOKEN`
 
-Important distinction:
+Deployment-level AI provider credentials belong in `.env`. Connection-specific
+integration secrets do not belong in the basic install flow.
 
-- deployment-level AI provider credentials belong in `.env`
-- connection-specific integration secrets do not belong in the normal install
-  section of this README
+## Public API URL And Ingest Endpoint
 
-For example, Slack and Resend connection secrets are configured through Groot’s
-normal product configuration flows, not as part of the basic Community install
-steps here.
+Groot builds its tenant ingest endpoint from `GROOT_PUBLIC_BASE_URL`. In the UI
+you can find it under `Settings -> General -> Ingest endpoint`.
 
-## Notes
+Use a value that points at the public API host that accepts `POST /events`, for
+example:
 
-- Community Edition is edition-stamped for single-tenant use.
-- Changing `.env` does not convert it into Cloud or Internal mode.
-- Groot API, agent runtime, and AI Gateway run as separate services in this
-  stack.
-- The Community bundle currently gives you the Groot backend stack. The
-  Next.js UI is not part of this Docker Compose bundle.
+```env
+GROOT_PUBLIC_BASE_URL=https://groot-api.example.com
+```
 
-## More
+With that setting, the ingest endpoint shown in Settings becomes:
 
-- Upgrade guidance: [UPGRADE.md](/Users/siddharthsameerambegaonkar/Desktop/Code/groot/deploy/docker-compose/community/UPGRADE.md)
+```text
+https://groot-api.example.com/events
+```
+
+Important notes:
+
+- do not point `GROOT_PUBLIC_BASE_URL` at the UI host unless that same host
+  also proxies `/events` to `groot-api`
+- for local webhook testing, a reverse tunnel such as ngrok can expose your
+  local API port publicly
+- for longer-lived deployments, put the API behind a proper HTTPS reverse proxy
+  or ingress such as Caddy, Nginx, Traefik, or a cloud load balancer
+
+## Updating Groot
+
+Use the built-in updater to move to the latest Community release:
+
+```sh
+groot update --check
+groot update
+```
+
+After updating:
+
+- run `groot status`
+- review `groot logs`
+- sign in and verify the app loads normally
+- confirm the ingest endpoint in `Settings -> General` still matches your
+  intended public API URL
+
+If you ever need to recover manually after a failed update, restore the
+previous Community image references in `.env`, then run:
+
+```sh
+groot restart
+groot migrate
+```

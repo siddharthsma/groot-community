@@ -130,6 +130,18 @@ PY
   fi
 }
 
+generate_master_key() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -base64 32 | tr -d '\n'
+  else
+    python3 - <<'PY'
+import base64
+import secrets
+print(base64.b64encode(secrets.token_bytes(32)).decode())
+PY
+  fi
+}
+
 prompt_value() {
   local key="$1"
   local prompt="$2"
@@ -154,6 +166,31 @@ prompt_value() {
   fi
 }
 
+explain_public_base_url() {
+  if [[ "$NON_INTERACTIVE" -eq 1 ]]; then
+    return
+  fi
+
+  cat <<EOF
+
+GROOT_PUBLIC_BASE_URL is the public API URL that external systems use to reach Groot.
+
+Examples:
+  - local testing with a reverse tunnel:
+      https://abc123.ngrok.app
+  - hosted deployment behind a reverse proxy:
+      https://groot-api.example.com
+
+This value is used to build the ingest endpoint shown in Settings.
+For example:
+  GROOT_PUBLIC_BASE_URL=https://groot-api.example.com
+  Ingest endpoint: https://groot-api.example.com/events
+
+If your UI and API are on different hosts, use the API host here.
+
+EOF
+}
+
 ensure_secret() {
   local key="$1"
   local placeholder="$2"
@@ -161,6 +198,17 @@ ensure_secret() {
   current="$(get_value "$key")"
   if [[ -z "$current" || "$current" == "$placeholder" ]]; then
     current="$(generate_secret)"
+  fi
+  set_value "$key" "$current"
+}
+
+ensure_master_key() {
+  local key="$1"
+  local placeholder="$2"
+  local current
+  current="$(get_value "$key")"
+  if [[ -z "$current" || "$current" == "$placeholder" ]]; then
+    current="$(generate_master_key)"
   fi
   set_value "$key" "$current"
 }
@@ -176,7 +224,11 @@ fi
 http_port="$(prompt_value "GROOT_HTTP_PORT" "HTTP port" "8080")"
 set_value "GROOT_HTTP_PORT" "$http_port"
 
-base_url="$(prompt_value "GROOT_PUBLIC_BASE_URL" "Public base URL" "http://localhost:${http_port}")"
+ui_port="$(prompt_value "GROOT_UI_PORT" "UI port" "3000")"
+set_value "GROOT_UI_PORT" "$ui_port"
+
+explain_public_base_url
+base_url="$(prompt_value "GROOT_PUBLIC_BASE_URL" "Public API base URL (used for ingest endpoints)" "http://localhost:${http_port}")"
 set_value "GROOT_PUBLIC_BASE_URL" "$base_url"
 
 tenant_name="$(prompt_value "COMMUNITY_TENANT_NAME" "Community tenant name" "Community Tenant")"
@@ -184,6 +236,9 @@ set_value "COMMUNITY_TENANT_NAME" "$tenant_name"
 
 api_image="$(prompt_value "GROOT_API_IMAGE" "Groot API image" "groot-community-api:latest")"
 set_value "GROOT_API_IMAGE" "$api_image"
+
+ui_image="$(prompt_value "GROOT_UI_IMAGE" "Groot UI image" "groot-community-ui:latest")"
+set_value "GROOT_UI_IMAGE" "$ui_image"
 
 runtime_image="$(prompt_value "AGENT_RUNTIME_IMAGE" "Agent runtime image" "groot-community-agent-runtime:latest")"
 set_value "AGENT_RUNTIME_IMAGE" "$runtime_image"
@@ -204,6 +259,7 @@ hf_token="$(prompt_value "HF_TOKEN" "Hugging Face token (optional)" "$(get_value
 set_value "HF_TOKEN" "$hf_token"
 
 ensure_secret "GROOT_SYSTEM_API_KEY" "system-secret"
+ensure_master_key "GROOT_SECRETS_MASTER_KEY" "community-secrets-master-key"
 ensure_secret "AI_GATEWAY_API_KEY" "groot-ai-gateway-dev-key"
 ensure_secret "AI_GATEWAY_STATUS_AUTH_API_KEY" "ai-gateway-status-secret"
 ensure_secret "AGENT_RUNTIME_SHARED_SECRET" "agent-runtime-secret"
@@ -227,6 +283,8 @@ Next steps:
        source "$PROFILE_FILE"
   2. Start Groot:
        groot start
-  3. Check status:
+  3. Open Groot:
+       http://localhost:$ui_port
+  4. Check status:
        groot status
 EOF

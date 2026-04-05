@@ -144,8 +144,9 @@ services:
       ROUTER_CONSUMER_GROUP: groot-community-router
       TEMPORAL_ADDRESS: temporal:7233
       TEMPORAL_NAMESPACE: default
+      GROOT_SECRETS_MASTER_KEY: ${GROOT_SECRETS_MASTER_KEY}
       GROOT_SYSTEM_API_KEY: ${GROOT_SYSTEM_API_KEY}
-      AUTH_MODE: api_key
+      AUTH_MODE: mixed
       API_KEY_HEADER: X-API-Key
       ADMIN_MODE_ENABLED: false
       AUDIT_ENABLED: true
@@ -188,6 +189,30 @@ services:
       DELIVERY_MAX_INTERVAL: 5m
     ports:
       - "${GROOT_HTTP_PORT:-8080}:8080"
+
+  frontend:
+    image: ${GROOT_UI_IMAGE}
+    depends_on:
+      groot-api:
+        condition: service_started
+    environment:
+      NODE_ENV: production
+      GROOT_API_INTERNAL_BASE_URL: http://groot-api:8080
+      NEXT_PUBLIC_GROOT_API_BASE_URL: http://localhost:${GROOT_HTTP_PORT:-8080}
+    ports:
+      - "${GROOT_UI_PORT:-3000}:3000"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "fetch('http://127.0.0.1:3000')
+          .then(r=>{if(!r.ok)process.exit(1);return r.text()})
+          .then(()=>process.exit(0))
+          .catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
 volumes:
   community-ai-gateway-state:
