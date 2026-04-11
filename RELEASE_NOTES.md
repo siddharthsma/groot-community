@@ -1,11 +1,11 @@
-# Groot Community 0.1.12
+# Groot Community 0.1.13
 
 ## Published Images
 
-- `groot-community-api:0.1.12`
-- `groot-community-ui:0.1.12`
-- `groot-community-agent-runtime:0.1.12`
-- `groot-community-ai-gateway:0.1.12`
+- `groot-community-api:0.1.13`
+- `groot-community-ui:0.1.13`
+- `groot-community-agent-runtime:0.1.13`
+- `groot-community-ai-gateway:0.1.13`
 
 ## Shipped First-Party Plugins
 
@@ -41,4 +41,4 @@ groot update
 
 ## Changes
 
-- Fix pluginloader e2e connection store stub
+- Build community API with plugin-compatible cgo

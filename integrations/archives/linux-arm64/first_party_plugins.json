@@ -3,86 +3,86 @@
     {
       "name": "asana",
       "artifact": "asana.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "66a0d2b4dd7b1d0475200ca233f96fd7fb850b65d8db342d0ff0da6acf1499a2"
+      "sha256": "178217a62b9048d6fb4bdad1986ce06abd6139d66935871169d4b3ce98b9d17b"
     },
     {
       "name": "clickup",
       "artifact": "clickup.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "c8a0412d33098e9ed2bce16a58388efb3619c571fc6502d7246354a87f3be39a"
+      "sha256": "ef29edc54050c6f3c0cb1db3055687a99aa362bdf1a45a147a680e596b44c297"
     },
     {
       "name": "http",
       "artifact": "http.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "2f1f24c49894a1c382312081a5999e10b2589d8e4fef7b1de124a319eb6f6ccd"
+      "sha256": "db7a43f5f5b302b7542ac6370d03ccb3dacaf4e7caf6304ab43f053458338a6e"
     },
     {
       "name": "hubspot",
       "artifact": "hubspot.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "0e1d6b27c74a4c53e546577dc2a16b697bad2cd9f39565abe425c8c9d83ad6db"
+      "sha256": "5b64ab32a9dc3bb8887c5ec458c6f8fb272ed2d17a09a945843f2b536d1e3f0f"
     },
     {
       "name": "notion",
       "artifact": "notion.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "203deaa5d10dfb6c699a7475495640f61cf3bfd84c94212e7ab4186821203c86"
+      "sha256": "bf0472166bcab6275c51a41f44f1a97d95f35f5e58989c8963edd3493a191652"
     },
     {
       "name": "pipedrive",
       "artifact": "pipedrive.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "88d3c3ea2e04b3ee799d8af41846afbdc6ba2225ba6d69f2ad50d0e370aa2c1e"
+      "sha256": "9c8c84653568c901b7afcc5e0741a10fa9fab15be75d0f766dff492c75c0b87a"
     },
     {
       "name": "resend",
       "artifact": "resend.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "92248135b66ad377256dfe550c372751910a63a7ad2c902f5db6508a135374cf"
+      "sha256": "098d6531f269b17b365125f5fae9474ce7e18d67b2746b2ea23703e6fae21e3b"
     },
     {
       "name": "salesforce",
       "artifact": "salesforce.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "54a1b1ec550bf87eabf46860f3d5e19df935ef30ae4dd1ccdf2f3eacf9a4330a"
+      "sha256": "8e185cc852d6b891476fade8c25193cc0ebd71bc5b2223a3b8f71e73af43d114"
     },
     {
       "name": "shopify",
       "artifact": "shopify.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "e6662dc705963b16a7aaca037e4f29a5f73ae3c6af2caa436b335d71e3428d35"
+      "sha256": "1f7329ee92cd67247c2bfb6328e6fe54d73fe23f1bdc0decc3d68dfee865970e"
     },
     {
       "name": "slack",
       "artifact": "slack.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "2b834c9d3b789303b6768cd6594834b4165de0caa7231fbfc58f20744341a72e"
+      "sha256": "f9b949586703b083b781482ff00ded876a4fdf583e3ccded912496a6af236b0b"
     },
     {
       "name": "stripe",
       "artifact": "stripe.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "74621e7a51193a6be6fc3739050b70e9ab6dc589ee580c7567c6ac7906a0ab36"
+      "sha256": "a5bfbb4ead9980d6b04036c502b69eeca11387140dab38c976c776963abf1ff6"
     },
     {
       "name": "trello",
       "artifact": "trello.so",
-      "version": "0.1.12",
+      "version": "0.1.13",
       "publisher": "groot",
-      "sha256": "b3dca051039a39fcab05f8970b4914ee1fcd54d2b703c927837985ae6469ba78"
+      "sha256": "7de6cfe6b548a2d8aae2362fdcb110f495348362748f08a02e70ac175ab0e50e"
     }
   ]
 }
