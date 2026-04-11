@@ -7,6 +7,7 @@ ENV_FILE="$SCRIPT_DIR/.env"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
 RELEASE_REPOSITORY_FILE="$SCRIPT_DIR/RELEASE_REPOSITORY"
 INTEGRATION_TOOLS_FILE="$SCRIPT_DIR/lib/integration-tools.sh"
+MIGRATION_RUNNER="$SCRIPT_DIR/lib/apply-tracked-migrations.sh"
 
 if [[ -f "$INTEGRATION_TOOLS_FILE" ]]; then
   # shellcheck source=/dev/null
@@ -408,10 +409,14 @@ run_migrations() {
     echo "Missing migrations directory: $MIGRATIONS_DIR" >&2
     exit 1
   fi
+  if [[ ! -x "$MIGRATION_RUNNER" ]]; then
+    echo "Missing migration runner: $MIGRATION_RUNNER" >&2
+    exit 1
+  fi
 
-  while IFS= read -r file; do
-    compose exec -T postgres psql -U groot -d groot < "$file"
-  done < <(find "$MIGRATIONS_DIR" -type f -name '*.sql' | sort)
+  "$MIGRATION_RUNNER" \
+    --migrations-dir "$MIGRATIONS_DIR" \
+    --psql-command "docker compose --env-file \"$ENV_FILE\" -f \"$COMPOSE_FILE\" exec -T postgres psql -U groot -d groot"
 }
 
 show_help() {
@@ -425,7 +430,7 @@ Commands:
   restart                    Restart the Community stack
   status                     Show Community stack status
   logs [service]             Tail logs for all services or one service
-  migrate                    Apply SQL migrations from the bundle
+  migrate                    Apply pending SQL migrations from the bundle
   integration init <name>    Scaffold a standalone integration plugin repository
   integration build          Build a local plugin repo into the Community bundle
   integration verify         Verify shipped and local plugin artifacts for this bundle

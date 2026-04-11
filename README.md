@@ -22,6 +22,9 @@ Requirements:
 
 - Docker
 - Docker Compose
+- a supported host architecture:
+  - Apple Silicon or other `arm64` / `aarch64` hosts
+  - `x86_64` hosts
 - a public HTTPS URL for the Groot API if external systems need to send events
   into Groot
 
@@ -70,10 +73,12 @@ This value is used to generate the ingest endpoint shown in `Settings -> General
 - asks for the minimum required settings
 - generates internal secrets
 - optionally stores AI provider credentials
+- detects your host architecture and installs the matching shipped first-party
+  plugin archive into the active runtime paths
 - adds this bundle directory to your shell `PATH`
 - exports `GROOT_HOME` so plugin build commands can target this bundle later
 - starts Postgres
-- applies the bundled database migrations
+- applies the bundled pending database migrations from the canonical baseline
 - leaves Groot ready to start with the browser UI as the main entry point
 
 After setup, use the `groot` command directly.
@@ -86,12 +91,16 @@ After setup, use the `groot` command directly.
 - `groot restart` restarts the stack
 - `groot status` shows current container status
 - `groot logs` tails logs for the whole stack or one service
-- `groot migrate` reapplies the bundled SQL migrations
+- `groot migrate` applies only pending bundled SQL migrations
 - `groot integration init` scaffolds a standalone integration plugin repository
 - `groot integration build` builds a local plugin repo into this Community bundle
 - `groot integration verify` checks shipped and local plugin artifacts for this bundle
 - `groot update --check` shows your installed version and the latest Community release
 - `groot update` upgrades the bundle to the latest Community release
+
+The bundled migration runner is tracked and pending-only. On an existing local
+database created before the baseline reset, the first run records the baseline
+instead of replaying legacy SQL.
 
 ## Configuration
 
@@ -132,9 +141,12 @@ GROOT_TELEMETRY_ENABLED=false
 
 The Community bundle is a runtime host for integration plugins.
 
-- runtime plugin artifacts live in `integrations/plugins/`
-- shipped first-party plugin expectations live in
+- setup installs active runtime plugin artifacts into `integrations/plugins/`
+- setup installs active shipped first-party metadata into
   `integrations/first_party_plugins.json`
+- the bundle ships architecture-specific first-party plugin archives under:
+  - `integrations/archives/linux-amd64/`
+  - `integrations/archives/linux-arm64/`
 - official first-party integrations are shipped that way too; Resend and Slack
   are the first shipped examples
 - those shipped first-party artifacts are required for the Community runtime;
@@ -148,6 +160,9 @@ The Community bundle is a runtime host for integration plugins.
   the stack will use at startup
 - shipped first-party plugin metadata includes version, publisher, and sha256
   provenance in `integrations/first_party_plugins.json`
+
+If the bundle does not include a shipped first-party archive for your host
+architecture, `./setup-community.sh` fails early before runtime startup.
 
 Typical workflow:
 

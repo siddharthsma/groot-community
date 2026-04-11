@@ -46,6 +46,7 @@ const (
 
 type Manifest struct {
 	Name                               string
+	DisplayName                        string
 	Summary                            string
 	Category                           string
 	Availability                       string
@@ -60,10 +61,20 @@ type Manifest struct {
 	Schema                             ConnectionSchema
 	Setup                              SetupSpec
 	SetupGuide                         *SetupGuide
+	Presentation                       *PresentationSpec
 	Operations                         []OperationSpec
+	AgentTools                         []AgentToolSpec
 	Inbound                            *InboundSpec
+	StreamInbound                      *StreamInboundSpec
+	OAuthBootstrap                     *OAuthBootstrapSpec
 	Correlation                        *CorrelationSpec
 	Schemas                            []SchemaSpec
+}
+
+type PresentationSpec struct {
+	LogoPath       string
+	FrameClassName string
+	ImageClassName string
 }
 
 type ConnectionSchema struct {
@@ -93,6 +104,13 @@ type SetupSpec struct {
 	Outputs              []SetupOutputSpec
 }
 
+type OAuthBootstrapSpec struct {
+	ButtonLabel        string
+	Description        string
+	RequiredFields     []string
+	AutoPopulateFields []string
+}
+
 type SetupGuide struct {
 	Title string
 	Steps []SetupStep
@@ -113,6 +131,7 @@ type SetupActionSpec struct {
 	Description   string
 	MutatesRemote bool
 	Idempotent    bool
+	InputSchema   json.RawMessage
 }
 
 type SetupOutputSpec struct {
@@ -123,9 +142,10 @@ type SetupOutputSpec struct {
 }
 
 type CorrelationSpec struct {
-	Fields     []CorrelationFieldHint
-	Strategies []CorrelationStrategyHint
-	Templates  []SessionKeyTemplateHint
+	ConfigField string
+	Fields      []CorrelationFieldHint
+	Strategies  []CorrelationStrategyHint
+	Templates   []SessionKeyTemplateHint
 }
 
 type CorrelationFieldHint struct {
@@ -151,6 +171,7 @@ type SessionKeyTemplateHint struct {
 
 type IntegrationSpec struct {
 	Name                               string
+	DisplayName                        string
 	Summary                            string
 	Category                           string
 	Availability                       string
@@ -161,9 +182,13 @@ type IntegrationSpec struct {
 	SupportsGlobalScope                bool
 	Config                             ConfigSpec
 	Setup                              SetupSpec
+	Presentation                       *PresentationSpec
 	Inbound                            *InboundSpec
+	StreamInbound                      *StreamInboundSpec
+	OAuthBootstrap                     *OAuthBootstrapSpec
 	Correlation                        *CorrelationSpec
 	Operations                         []OperationSpec
+	AgentTools                         []AgentToolSpec
 	Schemas                            []SchemaSpec
 }
 
@@ -181,9 +206,18 @@ type InboundSpec struct {
 	RouteKeyStrategy      string
 	RouteKeySource        string
 	RouteKeyConfigField   string
+	WebhookPath           string
 	SignatureVerification string
 	SupportsChallenge     bool
 	EventTypes            []string
+}
+
+type StreamInboundSpec struct {
+	Mode                 string
+	EventTypes           []string
+	SupportsReplay       bool
+	SupportsManualEnable bool
+	CapabilityText       string
 }
 
 type OperationSpec struct {
@@ -194,6 +228,16 @@ type OperationSpec struct {
 	ParamsSchemaJSON json.RawMessage
 	ResultSchemaJSON json.RawMessage
 	AgentSafe        bool
+}
+
+type AgentToolSpec struct {
+	Name            string
+	Description     string
+	ExecutionKind   string
+	IntegrationName string
+	Operation       string
+	InputSchemaJSON json.RawMessage
+	WaitForReply    bool
 }
 
 type SchemaSpec struct {
@@ -229,33 +273,8 @@ type Event struct {
 	Payload    json.RawMessage `json:"payload"`
 }
 
-type SlackRuntimeConfig struct {
-	APIBaseURL    string
-	SigningSecret string
-}
-
-type ResendRuntimeConfig struct {
-	APIKey           string
-	APIBaseURL       string
-	WebhookPublicURL string
-	ReceivingDomain  string
-	WebhookEvents    []string
-}
-
-type NotionRuntimeConfig struct {
-	APIBaseURL string
-	APIVersion string
-}
-
-type StripeRuntimeConfig struct {
-	WebhookToleranceSeconds int
-}
-
 type RuntimeConfig struct {
-	Slack  SlackRuntimeConfig
-	Resend ResendRuntimeConfig
-	Stripe StripeRuntimeConfig
-	Notion NotionRuntimeConfig
+	Values map[string]json.RawMessage
 }
 
 type ConnectionContext struct {
@@ -279,9 +298,11 @@ type SetupActionRequest struct {
 	Action     string
 	Connection ConnectionContext
 	Config     map[string]any
+	SetupJSON  json.RawMessage
 	Input      json.RawMessage
 	HTTPClient *http.Client
 	Runtime    RuntimeConfig
+	Host       SetupActionHost
 }
 
 type Usage struct {
@@ -318,6 +339,46 @@ type SetupActionResult struct {
 	OutputJSON   json.RawMessage   `json:"output_json,omitempty"`
 }
 
+type SetupActionHost interface {
+	GetPublicBaseURL(context.Context) (string, error)
+	GetConnectionConfig(context.Context, string, string) (json.RawMessage, error)
+	GetInboundEndpoint(context.Context, string, string) (InboundEndpoint, error)
+	PutInboundEndpoint(context.Context, InboundEndpoint) (InboundEndpoint, error)
+	DeleteInboundEndpoint(context.Context, string, string) error
+	GetStreamSubscription(context.Context, string, string) (StreamSubscription, error)
+	PutStreamSubscription(context.Context, StreamSubscription) (StreamSubscription, error)
+	DeleteStreamSubscription(context.Context, string, string) error
+}
+
+type OAuthBootstrapStartRequest struct {
+	Config      map[string]any
+	CallbackURL string
+	StateToken  string
+	HTTPClient  *http.Client
+	Runtime     RuntimeConfig
+}
+
+type OAuthBootstrapStartResult struct {
+	AuthorizeURL        string          `json:"authorize_url"`
+	ProviderContextJSON json.RawMessage `json:"provider_context_json,omitempty"`
+}
+
+type OAuthBootstrapCompleteRequest struct {
+	Config              map[string]any
+	Query               url.Values
+	CallbackURL         string
+	StateToken          string
+	ProviderContextJSON json.RawMessage
+	HTTPClient          *http.Client
+	Runtime             RuntimeConfig
+}
+
+type OAuthBootstrapCompleteResult struct {
+	FieldValuesJSON  json.RawMessage `json:"field_values_json,omitempty"`
+	SecretValuesJSON json.RawMessage `json:"secret_values_json,omitempty"`
+	StatusText       string          `json:"status_text,omitempty"`
+}
+
 type IntegrationPlugin interface {
 	Manifest() Manifest
 	ValidateConnectionConfig(map[string]any, ConnectionValidationContext) error
@@ -326,6 +387,11 @@ type IntegrationPlugin interface {
 
 type SetupActionPlugin interface {
 	ExecuteSetupAction(context.Context, SetupActionRequest) (SetupActionResult, error)
+}
+
+type OAuthBootstrapPlugin interface {
+	StartOAuthBootstrap(context.Context, OAuthBootstrapStartRequest) (OAuthBootstrapStartResult, error)
+	CompleteOAuthBootstrap(context.Context, OAuthBootstrapCompleteRequest) (OAuthBootstrapCompleteResult, error)
 }
 
 type Integration interface {
@@ -358,6 +424,19 @@ type AgentProjector interface {
 	ProjectAgentInput(context.Context, Event) (*AgentProjection, error)
 }
 
+type AgentSessionContextRequest struct {
+	Event           Event           `json:"event"`
+	ExistingContext json.RawMessage `json:"existing_context,omitempty"`
+}
+
+type AgentSessionContextProjection struct {
+	Context json.RawMessage `json:"context,omitempty"`
+}
+
+type AgentSessionContextProjector interface {
+	ProjectSessionContext(context.Context, AgentSessionContextRequest) (AgentSessionContextProjection, error)
+}
+
 type InboundHandler interface {
 	HandleInbound(context.Context, InboundRequest) (InboundResult, error)
 }
@@ -376,12 +455,7 @@ type ConnectionConfigValidator interface {
 	ValidateConnectionConfig(config map[string]any, defaults ConnectionConfigDefaults) error
 }
 
-type InboundRuntimeConfig struct {
-	Slack  SlackRuntimeConfig
-	Resend ResendRuntimeConfig
-	Stripe StripeRuntimeConfig
-	Notion NotionRuntimeConfig
-}
+type InboundRuntimeConfig = RuntimeConfig
 
 type InboundEndpoint struct {
 	IntegrationName string
@@ -390,6 +464,71 @@ type InboundEndpoint struct {
 	ConnectionID    string
 	Metadata        json.RawMessage
 	Status          string
+}
+
+type StreamSubscription struct {
+	IntegrationName string          `json:"integration_name"`
+	TenantID        string          `json:"tenant_id"`
+	ConnectionID    string          `json:"connection_id"`
+	Status          string          `json:"status"`
+	SetupJSON       json.RawMessage `json:"setup_json,omitempty"`
+	CheckpointJSON  json.RawMessage `json:"checkpoint_json,omitempty"`
+}
+
+type WaitMatchPredicate struct {
+	Path  string `json:"path"`
+	Op    string `json:"op"`
+	Value string `json:"value"`
+}
+
+type WaitPlanRequest struct {
+	AgentRunID     string
+	Tool           string
+	Connection     ConnectionContext
+	Config         map[string]any
+	SetupJSON      json.RawMessage
+	Arguments      json.RawMessage
+	SessionContext json.RawMessage
+	Result         OperationResult
+	Runtime        RuntimeConfig
+	SetupHost      SetupActionHost
+	InboundHost    InboundHost
+}
+
+type WaitPlan struct {
+	MatchEventType string
+	Match          []WaitMatchPredicate
+	TimeoutAt      time.Time
+	Summary        string
+	ContextJSON    json.RawMessage
+	Metadata       json.RawMessage
+}
+
+type AgentToolResolverRequest struct {
+	AgentRunID     string
+	Tool           string
+	Event          Event
+	ParentEvent    *Event
+	Connection     ConnectionContext
+	Config         map[string]any
+	SetupJSON      json.RawMessage
+	Arguments      json.RawMessage
+	SessionContext json.RawMessage
+	Runtime        RuntimeConfig
+	SetupHost      SetupActionHost
+}
+
+type AgentToolResolution struct {
+	Operation string
+	Params    json.RawMessage
+}
+
+type AgentToolResolver interface {
+	ResolveAgentTool(context.Context, AgentToolResolverRequest) (AgentToolResolution, error)
+}
+
+type WaitPlanner interface {
+	PlanWait(context.Context, WaitPlanRequest) (*WaitPlan, error)
 }
 
 type InboundRouteRequest struct {
@@ -435,6 +574,31 @@ type InboundResult struct {
 	Events   []InboundEvent       `json:"events,omitempty"`
 }
 
+type StreamSubscriptionRequest struct {
+	Connection     ConnectionContext `json:"connection"`
+	Config         map[string]any    `json:"config"`
+	SetupJSON      json.RawMessage   `json:"setup_json,omitempty"`
+	CheckpointJSON json.RawMessage   `json:"checkpoint_json,omitempty"`
+	HTTPClient     *http.Client      `json:"-"`
+	Runtime        RuntimeConfig     `json:"runtime"`
+	Host           SetupActionHost   `json:"-"`
+}
+
+type StreamConsumeResult struct {
+	Events         []InboundEvent  `json:"events,omitempty"`
+	CheckpointJSON json.RawMessage `json:"checkpoint_json,omitempty"`
+	Idle           bool            `json:"idle,omitempty"`
+}
+
+type StreamSession interface {
+	ConsumeNext(context.Context) (StreamConsumeResult, error)
+	Close(context.Context) error
+}
+
+type StreamSubscriptionPlugin interface {
+	OpenStream(context.Context, StreamSubscriptionRequest) (StreamSession, error)
+}
+
 func ValidateManifest(manifest Manifest) error {
 	name := strings.TrimSpace(manifest.Name)
 	if name == "" {
@@ -460,7 +624,16 @@ func ValidateManifest(manifest Manifest) error {
 	if err := validateSetupSpec(name, manifest.Setup); err != nil {
 		return err
 	}
+	if err := validateAgentTools(name, manifest.AgentTools); err != nil {
+		return err
+	}
+	if err := validateOAuthBootstrapSpec(name, manifest.OAuthBootstrap); err != nil {
+		return err
+	}
 	if err := validateInboundSpec(name, manifest.Inbound); err != nil {
+		return err
+	}
+	if err := validateStreamInboundSpec(name, manifest.StreamInbound); err != nil {
 		return err
 	}
 	if err := validateCorrelationSpec(name, manifest.Correlation); err != nil {
@@ -517,11 +690,14 @@ func LegacySpecToManifest(spec IntegrationSpec) Manifest {
 		Schema: ConnectionSchema{
 			Fields: legacyFieldsToConnectionFields(spec.Config.Fields),
 		},
-		Setup:       cloneSetupSpec(spec.Setup),
-		Operations:  ops,
-		Inbound:     cloneInboundSpec(spec.Inbound),
-		Correlation: cloneCorrelationSpec(spec.Correlation),
-		Schemas:     cloneSchemas(spec.Schemas),
+		Setup:          cloneSetupSpec(spec.Setup),
+		Operations:     ops,
+		AgentTools:     cloneAgentTools(spec.AgentTools),
+		Inbound:        cloneInboundSpec(spec.Inbound),
+		StreamInbound:  cloneStreamInboundSpec(spec.StreamInbound),
+		OAuthBootstrap: cloneOAuthBootstrapSpec(spec.OAuthBootstrap),
+		Correlation:    cloneCorrelationSpec(spec.Correlation),
+		Schemas:        cloneSchemas(spec.Schemas),
 	}
 	return manifest
 }
@@ -553,11 +729,14 @@ func ManifestToLegacySpec(manifest Manifest) IntegrationSpec {
 		Config: ConfigSpec{
 			Fields: connectionFieldsToLegacyFields(manifest.Schema.Fields),
 		},
-		Setup:       cloneSetupSpec(manifest.Setup),
-		Inbound:     cloneInboundSpec(manifest.Inbound),
-		Correlation: cloneCorrelationSpec(manifest.Correlation),
-		Operations:  ops,
-		Schemas:     cloneSchemas(manifest.Schemas),
+		Setup:          cloneSetupSpec(manifest.Setup),
+		Inbound:        cloneInboundSpec(manifest.Inbound),
+		StreamInbound:  cloneStreamInboundSpec(manifest.StreamInbound),
+		OAuthBootstrap: cloneOAuthBootstrapSpec(manifest.OAuthBootstrap),
+		Correlation:    cloneCorrelationSpec(manifest.Correlation),
+		Operations:     ops,
+		AgentTools:     cloneAgentTools(manifest.AgentTools),
+		Schemas:        cloneSchemas(manifest.Schemas),
 	}
 }
 
@@ -595,7 +774,60 @@ func validateSetupSpec(integrationName string, setup SetupSpec) error {
 		if _, exists := seen[name]; exists {
 			return fmt.Errorf("integration %s has duplicate setup action %s", integrationName, name)
 		}
+		if err := validateOptionalJSON(integrationName, "setup action input schema", name, action.InputSchema); err != nil {
+			return err
+		}
 		seen[name] = struct{}{}
+	}
+	return nil
+}
+
+func validateAgentTools(integrationName string, tools []AgentToolSpec) error {
+	seen := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		name := strings.TrimSpace(tool.Name)
+		if name == "" {
+			return fmt.Errorf("integration %s has empty agent tool name", integrationName)
+		}
+		if _, exists := seen[name]; exists {
+			return fmt.Errorf("integration %s has duplicate agent tool %s", integrationName, name)
+		}
+		if strings.TrimSpace(tool.Operation) == "" {
+			return fmt.Errorf("integration %s agent tool %s missing operation", integrationName, name)
+		}
+		if err := validateOptionalJSON(integrationName, "agent tool input schema", name, tool.InputSchemaJSON); err != nil {
+			return err
+		}
+		seen[name] = struct{}{}
+	}
+	return nil
+}
+
+func validateOAuthBootstrapSpec(integrationName string, spec *OAuthBootstrapSpec) error {
+	if spec == nil {
+		return nil
+	}
+	if strings.TrimSpace(spec.ButtonLabel) == "" {
+		return fmt.Errorf("integration %s oauth bootstrap button label is required", integrationName)
+	}
+	required := map[string]struct{}{}
+	for _, field := range spec.RequiredFields {
+		name := strings.TrimSpace(field)
+		if name == "" {
+			return fmt.Errorf("integration %s has empty oauth bootstrap required field", integrationName)
+		}
+		required[name] = struct{}{}
+	}
+	auto := map[string]struct{}{}
+	for _, field := range spec.AutoPopulateFields {
+		name := strings.TrimSpace(field)
+		if name == "" {
+			return fmt.Errorf("integration %s has empty oauth bootstrap auto-populate field", integrationName)
+		}
+		if _, exists := auto[name]; exists {
+			return fmt.Errorf("integration %s has duplicate oauth bootstrap auto-populate field %s", integrationName, name)
+		}
+		auto[name] = struct{}{}
 	}
 	return nil
 }
@@ -615,6 +847,9 @@ func validateInboundSpec(integrationName string, spec *InboundSpec) error {
 	if strings.TrimSpace(spec.RouteKeySource) == RouteKeySourceConfigField && strings.TrimSpace(spec.RouteKeyConfigField) == "" {
 		return fmt.Errorf("integration %s inbound route key config field is required", integrationName)
 	}
+	if webhookPath := strings.TrimSpace(spec.WebhookPath); webhookPath != "" && !strings.HasPrefix(webhookPath, "/") {
+		return fmt.Errorf("integration %s inbound webhook path must start with /", integrationName)
+	}
 	if len(spec.EventTypes) == 0 {
 		return fmt.Errorf("integration %s inbound event types are required", integrationName)
 	}
@@ -626,6 +861,30 @@ func validateInboundSpec(integrationName string, spec *InboundSpec) error {
 		}
 		if _, exists := eventTypes[trimmed]; exists {
 			return fmt.Errorf("integration %s has duplicate inbound event type %s", integrationName, trimmed)
+		}
+		eventTypes[trimmed] = struct{}{}
+	}
+	return nil
+}
+
+func validateStreamInboundSpec(integrationName string, spec *StreamInboundSpec) error {
+	if spec == nil {
+		return nil
+	}
+	if strings.TrimSpace(spec.Mode) == "" {
+		return fmt.Errorf("integration %s stream inbound mode is required", integrationName)
+	}
+	if len(spec.EventTypes) == 0 {
+		return fmt.Errorf("integration %s stream inbound event types are required", integrationName)
+	}
+	eventTypes := make(map[string]struct{}, len(spec.EventTypes))
+	for _, eventType := range spec.EventTypes {
+		trimmed := strings.TrimSpace(eventType)
+		if trimmed == "" {
+			return fmt.Errorf("integration %s has empty stream inbound event type", integrationName)
+		}
+		if _, exists := eventTypes[trimmed]; exists {
+			return fmt.Errorf("integration %s has duplicate stream inbound event type %s", integrationName, trimmed)
 		}
 		eventTypes[trimmed] = struct{}{}
 	}
@@ -804,9 +1063,35 @@ func cloneInboundSpec(spec *InboundSpec) *InboundSpec {
 		RouteKeyStrategy:      spec.RouteKeyStrategy,
 		RouteKeySource:        routeKeySource,
 		RouteKeyConfigField:   spec.RouteKeyConfigField,
+		WebhookPath:           spec.WebhookPath,
 		SignatureVerification: spec.SignatureVerification,
 		SupportsChallenge:     spec.SupportsChallenge,
 		EventTypes:            append([]string(nil), spec.EventTypes...),
+	}
+}
+
+func cloneStreamInboundSpec(spec *StreamInboundSpec) *StreamInboundSpec {
+	if spec == nil {
+		return nil
+	}
+	return &StreamInboundSpec{
+		Mode:                 spec.Mode,
+		EventTypes:           append([]string(nil), spec.EventTypes...),
+		SupportsReplay:       spec.SupportsReplay,
+		SupportsManualEnable: spec.SupportsManualEnable,
+		CapabilityText:       spec.CapabilityText,
+	}
+}
+
+func cloneOAuthBootstrapSpec(spec *OAuthBootstrapSpec) *OAuthBootstrapSpec {
+	if spec == nil {
+		return nil
+	}
+	return &OAuthBootstrapSpec{
+		ButtonLabel:        spec.ButtonLabel,
+		Description:        spec.Description,
+		RequiredFields:     append([]string(nil), spec.RequiredFields...),
+		AutoPopulateFields: append([]string(nil), spec.AutoPopulateFields...),
 	}
 }
 
@@ -861,10 +1146,30 @@ func cloneCorrelationSpec(spec *CorrelationSpec) *CorrelationSpec {
 		})
 	}
 	return &CorrelationSpec{
-		Fields:     fields,
-		Strategies: strategies,
-		Templates:  templates,
+		ConfigField: spec.ConfigField,
+		Fields:      fields,
+		Strategies:  strategies,
+		Templates:   templates,
 	}
+}
+
+func cloneAgentTools(specs []AgentToolSpec) []AgentToolSpec {
+	if len(specs) == 0 {
+		return nil
+	}
+	out := make([]AgentToolSpec, 0, len(specs))
+	for _, spec := range specs {
+		out = append(out, AgentToolSpec{
+			Name:            spec.Name,
+			Description:     spec.Description,
+			ExecutionKind:   spec.ExecutionKind,
+			IntegrationName: spec.IntegrationName,
+			Operation:       spec.Operation,
+			InputSchemaJSON: cloneRawMessage(spec.InputSchemaJSON),
+			WaitForReply:    spec.WaitForReply,
+		})
+	}
+	return out
 }
 
 func cloneSchemas(specs []SchemaSpec) []SchemaSpec {

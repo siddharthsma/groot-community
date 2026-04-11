@@ -7,6 +7,11 @@ func MarshalSchema(schema map[string]any) json.RawMessage {
 	return body
 }
 
+func MustMarshalJSON(v map[string]any) json.RawMessage {
+	body, _ := json.Marshal(v)
+	return body
+}
+
 func ObjectSchema(properties map[string]any, allowAdditional bool) map[string]any {
 	required := make([]string, 0, len(properties))
 	for key := range properties {

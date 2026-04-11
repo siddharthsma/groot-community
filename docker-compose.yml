@@ -163,11 +163,14 @@ services:
       GRAPH_EXECUTION_MAX_DEPTH: 25
       GRAPH_DEFAULT_LIMIT: 500
       GROOT_PUBLIC_BASE_URL: ${GROOT_PUBLIC_BASE_URL}
+      GROOT_INTERNAL_TOOL_ENDPOINT_URL: ${GROOT_INTERNAL_TOOL_ENDPOINT_URL:-http://groot-api:8080/internal/agent-runtime/tool-calls}
       GROOT_INTEGRATION_PLUGIN_DIR: /app/integrations/plugins
       GROOT_INTEGRATION_FIRST_PARTY_PLUGINS_PATH: /app/integrations/first_party_plugins.json
       GROOT_INTEGRATION_INSTALLED_PATH: /app/integrations/installed.json
       GROOT_INTEGRATION_TRUSTED_KEYS_PATH: /app/integrations/trusted_keys.json
       GROOT_INTEGRATION_CACHE_DIR: /app/integrations/cache
+      AI_GATEWAY_BASE_URL: ${AI_GATEWAY_BASE_URL:-http://ai-gateway:8787}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-groot-ai-gateway-dev-key}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_API_BASE_URL: https://api.openai.com/v1
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}

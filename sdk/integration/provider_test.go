@@ -32,6 +32,18 @@ func TestValidateSpecRejectsDuplicateInboundEventType(t *testing.T) {
 	}
 }
 
+func TestValidateSpecRejectsBlankStreamInboundEventType(t *testing.T) {
+	spec := validSpec()
+	spec.StreamInbound = &StreamInboundSpec{
+		Mode:       "stream",
+		EventTypes: []string{"example.created.v1", "   "},
+	}
+	err := ValidateSpec(spec)
+	if err == nil || !strings.Contains(err.Error(), "empty stream inbound event type") {
+		t.Fatalf("ValidateSpec() error = %v, want empty stream inbound event type", err)
+	}
+}
+
 func TestValidateSpecRejectsBlankHostRequirement(t *testing.T) {
 	spec := validSpec()
 	spec.HostRequirements = []string{"webhook_ingress", " "}
@@ -118,6 +130,9 @@ func TestLegacySpecToManifestAppliesCompatibilityDefaults(t *testing.T) {
 	}
 	if manifest.Inbound == nil || manifest.Inbound.SignatureVerification != "" || manifest.Inbound.SupportsChallenge {
 		t.Fatalf("LegacySpecToManifest() inbound defaults not preserved: %+v", manifest.Inbound)
+	}
+	if manifest.StreamInbound != nil {
+		t.Fatalf("LegacySpecToManifest() stream inbound = %+v, want nil by default", manifest.StreamInbound)
 	}
 }
 

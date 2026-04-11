@@ -1,2 +1,0 @@
--- Phase 0 placeholder migration.
--- No schema changes are required yet.

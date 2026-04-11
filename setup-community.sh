@@ -10,6 +10,8 @@ GROOT_HOME_EXPORT_LINE="export GROOT_HOME=\"$SCRIPT_DIR\""
 COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
 INTEGRATIONS_DIR="$SCRIPT_DIR/integrations"
+INTEGRATION_ARCHIVES_DIR="$INTEGRATIONS_DIR/archives"
+MIGRATION_RUNNER="$SCRIPT_DIR/lib/apply-tracked-migrations.sh"
 
 NON_INTERACTIVE=0
 if [[ "${1:-}" == "--non-interactive" ]]; then
@@ -51,10 +53,14 @@ run_migrations() {
     echo "Missing migrations directory: $MIGRATIONS_DIR" >&2
     exit 1
   fi
+  if [[ ! -x "$MIGRATION_RUNNER" ]]; then
+    echo "Missing migration runner: $MIGRATION_RUNNER" >&2
+    exit 1
+  fi
 
-  while IFS= read -r file; do
-    compose exec -T postgres psql -U groot -d groot < "$file"
-  done < <(find "$MIGRATIONS_DIR" -type f -name '*.sql' | sort)
+  "$MIGRATION_RUNNER" \
+    --migrations-dir "$MIGRATIONS_DIR" \
+    --psql-command "docker compose --env-file \"$ENV_FILE\" -f \"$COMPOSE_FILE\" exec -T postgres psql -U groot -d groot"
 }
 
 detect_profile_file() {
@@ -118,7 +124,11 @@ ensure_path_install() {
 }
 
 ensure_integration_runtime_files() {
-  mkdir -p "$INTEGRATIONS_DIR/plugins" "$INTEGRATIONS_DIR/cache"
+  mkdir -p \
+    "$INTEGRATIONS_DIR/plugins" \
+    "$INTEGRATIONS_DIR/cache" \
+    "$INTEGRATION_ARCHIVES_DIR/linux-amd64/plugins" \
+    "$INTEGRATION_ARCHIVES_DIR/linux-arm64/plugins"
 
   if [[ ! -f "$INTEGRATIONS_DIR/installed.json" ]]; then
     cat >"$INTEGRATIONS_DIR/installed.json" <<'EOF'
@@ -228,6 +238,53 @@ EOF
 }
 EOF
   fi
+}
+
+detect_supported_plugin_archive() {
+  local raw_arch
+  raw_arch="$(uname -m)"
+
+  case "$raw_arch" in
+    x86_64)
+      echo "linux-amd64"
+      ;;
+    arm64|aarch64)
+      echo "linux-arm64"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+install_firstparty_plugin_bundle() {
+  local archive_name archive_dir metadata_src plugins_src
+  archive_name="$(detect_supported_plugin_archive)"
+  if [[ -z "$archive_name" ]]; then
+    echo "Unsupported host architecture: $(uname -m). Groot Community currently supports x86_64, arm64, and aarch64 hosts." >&2
+    exit 1
+  fi
+
+  archive_dir="$INTEGRATION_ARCHIVES_DIR/$archive_name"
+  metadata_src="$archive_dir/first_party_plugins.json"
+  plugins_src="$archive_dir/plugins"
+
+  if [[ ! -f "$metadata_src" ]]; then
+    if [[ -f "$INTEGRATIONS_DIR/first_party_plugins.json" ]]; then
+      return 0
+    fi
+    echo "Missing first-party plugin metadata for $archive_name: $metadata_src" >&2
+    exit 1
+  fi
+
+  if [[ ! -d "$plugins_src" ]]; then
+    echo "Missing first-party plugin archive directory for $archive_name: $plugins_src" >&2
+    exit 1
+  fi
+
+  rm -f "$INTEGRATIONS_DIR/plugins"/*.so
+  find "$plugins_src" -maxdepth 1 -type f -name '*.so' -exec cp {} "$INTEGRATIONS_DIR/plugins/" \;
+  cp "$metadata_src" "$INTEGRATIONS_DIR/first_party_plugins.json"
 }
 
 get_value() {
@@ -435,6 +492,7 @@ require_cmd docker
 require_docker_compose
 ensure_path_install
 ensure_integration_runtime_files
+install_firstparty_plugin_bundle
 
 if [[ ! -f "$ENV_FILE" ]]; then
   cp "$ENV_EXAMPLE" "$ENV_FILE"
