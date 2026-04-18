@@ -3,86 +3,93 @@
     {
       "name": "asana",
       "artifact": "asana.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "178217a62b9048d6fb4bdad1986ce06abd6139d66935871169d4b3ce98b9d17b"
+      "sha256": "87bcd617ddc24aca273bd3ac90a48286f2ccee09e957619ee79c7b86da8c4f7d"
     },
     {
       "name": "clickup",
       "artifact": "clickup.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "ef29edc54050c6f3c0cb1db3055687a99aa362bdf1a45a147a680e596b44c297"
+      "sha256": "e1ca6be0c7264d342be6a3a1144e02425dfecfbb8367b290ea7afe6461524567"
+    },
+    {
+      "name": "elevenlabs",
+      "artifact": "elevenlabs.so",
+      "version": "0.1.14",
+      "publisher": "groot",
+      "sha256": "c9ba9a22d68dd47a83d0ba94cd186fe850af08e6af10939b0d654d8da65b6972"
     },
     {
       "name": "http",
       "artifact": "http.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "db7a43f5f5b302b7542ac6370d03ccb3dacaf4e7caf6304ab43f053458338a6e"
+      "sha256": "a6faf3da7c42fa374249fb1b388163aea9c2ef51c9a062e1a2089c050099cd3a"
     },
     {
       "name": "hubspot",
       "artifact": "hubspot.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "5b64ab32a9dc3bb8887c5ec458c6f8fb272ed2d17a09a945843f2b536d1e3f0f"
+      "sha256": "af980fb44c334bdabcc1bd7b02f3c9f8a6c0f23e6bc8e8746b842bb128620ce6"
     },
     {
       "name": "notion",
       "artifact": "notion.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "bf0472166bcab6275c51a41f44f1a97d95f35f5e58989c8963edd3493a191652"
+      "sha256": "4508badfb12f9580298d65b3b0425d3bb182983a18927973d781a2ca1df8ba51"
     },
     {
       "name": "pipedrive",
       "artifact": "pipedrive.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "9c8c84653568c901b7afcc5e0741a10fa9fab15be75d0f766dff492c75c0b87a"
+      "sha256": "585c5671cdfa626c8a8fcd3fcfc7fd0fa7620ee204b93f8c94f8d87fb8686645"
     },
     {
       "name": "resend",
       "artifact": "resend.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "098d6531f269b17b365125f5fae9474ce7e18d67b2746b2ea23703e6fae21e3b"
+      "sha256": "d8fcc3abcb84ac81a76366d2a685ed743beb35d5a4e7bdd98f4ca52275509fae"
     },
     {
       "name": "salesforce",
       "artifact": "salesforce.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "8e185cc852d6b891476fade8c25193cc0ebd71bc5b2223a3b8f71e73af43d114"
+      "sha256": "9b5dab01c4d575cdce2b5f53d8f16b6c404476d69a518e12b0c4df61955b171c"
     },
     {
       "name": "shopify",
       "artifact": "shopify.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "1f7329ee92cd67247c2bfb6328e6fe54d73fe23f1bdc0decc3d68dfee865970e"
+      "sha256": "7de10959c856cbd3681300203deb7868f4ff2a74cc6502f5ba9297a7a37a0e53"
     },
     {
       "name": "slack",
       "artifact": "slack.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "f9b949586703b083b781482ff00ded876a4fdf583e3ccded912496a6af236b0b"
+      "sha256": "e121c872618455cc1e07e81cde842de018d4a2a657fcaeb63ea4ee5972f4c2d6"
     },
     {
       "name": "stripe",
       "artifact": "stripe.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "a5bfbb4ead9980d6b04036c502b69eeca11387140dab38c976c776963abf1ff6"
+      "sha256": "8cf3c68c3074ea2344603b1f0228bf4b4169261fc34afd7e930b1fc7eb504e8c"
     },
     {
       "name": "trello",
       "artifact": "trello.so",
-      "version": "0.1.13",
+      "version": "0.1.14",
       "publisher": "groot",
-      "sha256": "7de6cfe6b548a2d8aae2362fdcb110f495348362748f08a02e70ac175ab0e50e"
+      "sha256": "f46e772d2c798609cb9ec3abebb0e8082123165ef3bf4dcb0cd946db6d3ae140"
     }
   ]
 }

@@ -258,7 +258,7 @@ detect_supported_plugin_archive() {
 }
 
 install_firstparty_plugin_bundle() {
-  local archive_name archive_dir metadata_src plugins_src
+  local archive_name archive_dir metadata_src plugins_src previous_metadata
   archive_name="$(detect_supported_plugin_archive)"
   if [[ -z "$archive_name" ]]; then
     echo "Unsupported host architecture: $(uname -m). Groot Community currently supports x86_64, arm64, and aarch64 hosts." >&2
@@ -282,9 +282,64 @@ install_firstparty_plugin_bundle() {
     exit 1
   fi
 
-  rm -f "$INTEGRATIONS_DIR/plugins"/*.so
-  find "$plugins_src" -maxdepth 1 -type f -name '*.so' -exec cp {} "$INTEGRATIONS_DIR/plugins/" \;
-  cp "$metadata_src" "$INTEGRATIONS_DIR/first_party_plugins.json"
+  previous_metadata="$INTEGRATIONS_DIR/first_party_plugins.json"
+  sync_firstparty_plugins "$previous_metadata" "$metadata_src" "$plugins_src" "$INTEGRATIONS_DIR/plugins" "$INTEGRATIONS_DIR/first_party_plugins.json"
+}
+
+metadata_artifacts() {
+  local metadata_file="$1"
+  if [[ ! -f "$metadata_file" ]]; then
+    return 0
+  fi
+
+  python3 - <<'PY' "$metadata_file"
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    raise SystemExit(0)
+
+for plugin in payload.get("plugins", []):
+    artifact = str(plugin.get("artifact", "")).strip()
+    if artifact:
+        print(artifact)
+PY
+}
+
+sync_firstparty_plugins() {
+  local old_metadata="$1"
+  local new_metadata="$2"
+  local source_dir="$3"
+  local plugin_dir="$4"
+  local target_metadata="$5"
+  local artifact
+
+  mkdir -p "$plugin_dir"
+
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] || continue
+    rm -f "$plugin_dir/$artifact"
+  done < <(
+    {
+      metadata_artifacts "$old_metadata"
+      metadata_artifacts "$new_metadata"
+    } | awk 'NF && !seen[$0]++'
+  )
+
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] || continue
+    if [[ ! -f "$source_dir/$artifact" ]]; then
+      echo "Missing first-party plugin artifact: $source_dir/$artifact" >&2
+      exit 1
+    fi
+    cp "$source_dir/$artifact" "$plugin_dir/$artifact"
+  done < <(metadata_artifacts "$new_metadata")
+
+  cp "$new_metadata" "$target_metadata"
 }
 
 get_value() {

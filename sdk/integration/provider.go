@@ -78,7 +78,9 @@ type PresentationSpec struct {
 }
 
 type ConnectionSchema struct {
-	Fields []ConnectionField
+	Label       string
+	Description string
+	Fields      []ConnectionField
 }
 
 type ConnectionField struct {
@@ -496,12 +498,17 @@ type WaitPlanRequest struct {
 }
 
 type WaitPlan struct {
+	// MatchEventType is the single event type to wait for. Use MatchEventTypes
+	// when the wait should terminate on any one of multiple event types.
 	MatchEventType string
-	Match          []WaitMatchPredicate
-	TimeoutAt      time.Time
-	Summary        string
-	ContextJSON    json.RawMessage
-	Metadata       json.RawMessage
+	// MatchEventTypes lists every event type that can terminate this wait.
+	// When set, it takes precedence over MatchEventType.
+	MatchEventTypes []string
+	Match           []WaitMatchPredicate
+	TimeoutAt       time.Time
+	Summary         string
+	ContextJSON     json.RawMessage
+	Metadata        json.RawMessage
 }
 
 type AgentToolResolverRequest struct {

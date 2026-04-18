@@ -8,6 +8,9 @@ MIGRATIONS_DIR="$SCRIPT_DIR/migrations"
 RELEASE_REPOSITORY_FILE="$SCRIPT_DIR/RELEASE_REPOSITORY"
 INTEGRATION_TOOLS_FILE="$SCRIPT_DIR/lib/integration-tools.sh"
 MIGRATION_RUNNER="$SCRIPT_DIR/lib/apply-tracked-migrations.sh"
+BUNDLE_VERSION_FILE="$SCRIPT_DIR/VERSION"
+INTEGRATIONS_DIR="$SCRIPT_DIR/integrations"
+INTEGRATION_ARCHIVES_DIR="$INTEGRATIONS_DIR/archives"
 
 if [[ -f "$INTEGRATION_TOOLS_FILE" ]]; then
   # shellcheck source=/dev/null
@@ -28,6 +31,10 @@ require_cmd() {
   fi
 }
 
+require_docker() {
+  require_cmd docker
+}
+
 ensure_env() {
   if [[ ! -f "$ENV_FILE" ]]; then
     echo "Missing $ENV_FILE. Run ./setup-community.sh first." >&2
@@ -39,10 +46,120 @@ compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
+metadata_artifacts() {
+  local metadata_file="$1"
+  if [[ ! -f "$metadata_file" ]]; then
+    return 0
+  fi
+
+  python3 - <<'PY' "$metadata_file"
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    payload = json.loads(path.read_text())
+except Exception:
+    raise SystemExit(0)
+
+for plugin in payload.get("plugins", []):
+    artifact = str(plugin.get("artifact", "")).strip()
+    if artifact:
+        print(artifact)
+PY
+}
+
+detect_supported_plugin_archive() {
+  local raw_arch
+  raw_arch="$(uname -m)"
+
+  case "$raw_arch" in
+    x86_64)
+      echo "linux-amd64"
+      ;;
+    arm64|aarch64)
+      echo "linux-arm64"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
+
+sync_firstparty_plugins() {
+  local old_metadata="$1"
+  local new_metadata="$2"
+  local source_dir="$3"
+  local plugin_dir="$4"
+  local target_metadata="$5"
+  local artifact
+
+  mkdir -p "$plugin_dir"
+
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] || continue
+    rm -f "$plugin_dir/$artifact"
+  done < <(
+    {
+      metadata_artifacts "$old_metadata"
+      metadata_artifacts "$new_metadata"
+    } | awk 'NF && !seen[$0]++'
+  )
+
+  while IFS= read -r artifact; do
+    [[ -n "$artifact" ]] || continue
+    if [[ ! -f "$source_dir/$artifact" ]]; then
+      echo "Missing first-party plugin artifact: $source_dir/$artifact" >&2
+      exit 1
+    fi
+    cp "$source_dir/$artifact" "$plugin_dir/$artifact"
+  done < <(metadata_artifacts "$new_metadata")
+
+  cp "$new_metadata" "$target_metadata"
+}
+
+refresh_firstparty_plugin_bundle() {
+  local archive_name archive_dir metadata_src plugins_src current_metadata old_metadata
+  archive_name="$(detect_supported_plugin_archive)"
+  if [[ -z "$archive_name" ]]; then
+    echo "Unsupported host architecture: $(uname -m). Groot Community currently supports x86_64, arm64, and aarch64 hosts." >&2
+    exit 1
+  fi
+
+  archive_dir="$INTEGRATION_ARCHIVES_DIR/$archive_name"
+  metadata_src="$archive_dir/first_party_plugins.json"
+  plugins_src="$archive_dir/plugins"
+  current_metadata="$INTEGRATIONS_DIR/first_party_plugins.json"
+  old_metadata="${1:-$current_metadata}"
+
+  if [[ ! -f "$metadata_src" ]]; then
+    echo "Missing first-party plugin metadata for $archive_name: $metadata_src" >&2
+    exit 1
+  fi
+  if [[ ! -d "$plugins_src" ]]; then
+    echo "Missing first-party plugin archive directory for $archive_name: $plugins_src" >&2
+    exit 1
+  fi
+
+  sync_firstparty_plugins "$old_metadata" "$metadata_src" "$plugins_src" "$INTEGRATIONS_DIR/plugins" "$INTEGRATIONS_DIR/first_party_plugins.json"
+}
+
 get_value() {
   local key="$1"
   local line
   line="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 || true)"
+  echo "${line#*=}"
+}
+
+get_value_from_file() {
+  local file="$1"
+  local key="$2"
+  local line
+  if [[ ! -f "$file" ]]; then
+    return 0
+  fi
+  line="$(grep -E "^${key}=" "$file" | tail -n 1 || true)"
   echo "${line#*=}"
 }
 
@@ -246,6 +363,99 @@ print(version)
 PY
 }
 
+release_tarball_url() {
+  local repo="$1"
+  local version="$2"
+  echo "https://github.com/${repo}/archive/refs/tags/v${version}.tar.gz"
+}
+
+download_release_bundle() {
+  local repo="$1"
+  local version="$2"
+  local target_dir="$3"
+  local tarball="$target_dir/community-release.tar.gz"
+  local extract_dir="$target_dir/extracted"
+  local root
+
+  require_cmd curl
+  require_cmd tar
+
+  mkdir -p "$extract_dir"
+  curl -fsSL "$(release_tarball_url "$repo" "$version")" -o "$tarball"
+  tar -xzf "$tarball" -C "$extract_dir"
+  root="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [[ -z "$root" || ! -d "$root" ]]; then
+    echo "Downloaded Community release archive did not contain an extractable bundle." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "$root"
+}
+
+replace_bundle_from_release() {
+  local release_root="$1"
+  local preserve_dir="$2"
+
+  mkdir -p "$preserve_dir"
+
+  if [[ -f "$ENV_FILE" ]]; then
+    cp "$ENV_FILE" "$preserve_dir/.env"
+  fi
+  if [[ -f "$INTEGRATIONS_DIR/installed.json" ]]; then
+    cp "$INTEGRATIONS_DIR/installed.json" "$preserve_dir/installed.json"
+  fi
+  if [[ -f "$INTEGRATIONS_DIR/trusted_keys.json" ]]; then
+    cp "$INTEGRATIONS_DIR/trusted_keys.json" "$preserve_dir/trusted_keys.json"
+  fi
+  if [[ -f "$INTEGRATIONS_DIR/first_party_plugins.json" ]]; then
+    cp "$INTEGRATIONS_DIR/first_party_plugins.json" "$preserve_dir/first_party_plugins.json"
+  fi
+  if [[ -d "$INTEGRATIONS_DIR/cache" ]]; then
+    cp -R "$INTEGRATIONS_DIR/cache" "$preserve_dir/cache"
+  fi
+  if [[ -d "$INTEGRATIONS_DIR/plugins" ]]; then
+    cp -R "$INTEGRATIONS_DIR/plugins" "$preserve_dir/plugins"
+  fi
+
+  find "$SCRIPT_DIR" -mindepth 1 -maxdepth 1 \
+    ! -name '.env' \
+    ! -name '.git' \
+    -exec rm -rf {} +
+
+  tar -C "$release_root" -cf - . | tar -C "$SCRIPT_DIR" -xf -
+
+  mkdir -p "$INTEGRATIONS_DIR"
+  if [[ -f "$preserve_dir/.env" ]]; then
+    cp "$preserve_dir/.env" "$ENV_FILE"
+  fi
+  if [[ -f "$preserve_dir/installed.json" ]]; then
+    cp "$preserve_dir/installed.json" "$INTEGRATIONS_DIR/installed.json"
+  fi
+  if [[ -f "$preserve_dir/trusted_keys.json" ]]; then
+    cp "$preserve_dir/trusted_keys.json" "$INTEGRATIONS_DIR/trusted_keys.json"
+  fi
+  if [[ -d "$preserve_dir/cache" ]]; then
+    rm -rf "$INTEGRATIONS_DIR/cache"
+    cp -R "$preserve_dir/cache" "$INTEGRATIONS_DIR/cache"
+  fi
+  if [[ -d "$preserve_dir/plugins" ]]; then
+    mkdir -p "$INTEGRATIONS_DIR/plugins"
+    cp -R "$preserve_dir/plugins/." "$INTEGRATIONS_DIR/plugins/"
+  fi
+}
+
+sync_image_refs_from_bundle() {
+  local bundle_env="$SCRIPT_DIR/.env.example"
+  local key value
+
+  for key in GROOT_API_IMAGE GROOT_UI_IMAGE AGENT_RUNTIME_IMAGE AI_GATEWAY_IMAGE; do
+    value="$(get_value_from_file "$bundle_env" "$key")"
+    if [[ -n "$value" ]]; then
+      set_value "$key" "$value"
+    fi
+  done
+}
+
 verify_stack_health() {
   ensure_env
   require_cmd curl
@@ -295,6 +505,8 @@ apply_update() {
   local assume_yes="$1"
   ensure_env
   require_docker_compose
+  require_docker
+  require_cmd python3
 
   local repo current latest
   repo="$(get_release_repository)"
@@ -318,20 +530,24 @@ apply_update() {
     fi
   fi
 
-  local api_repo ui_repo runtime_repo gateway_repo
-  IFS=$'\t' read -r api_repo _ <<<"$(extract_image_parts "GROOT_API_IMAGE" "groot-community-api")"
-  IFS=$'\t' read -r ui_repo _ <<<"$(extract_image_parts "GROOT_UI_IMAGE" "groot-community-ui")"
-  IFS=$'\t' read -r runtime_repo _ <<<"$(extract_image_parts "AGENT_RUNTIME_IMAGE" "groot-community-agent-runtime")"
-  IFS=$'\t' read -r gateway_repo _ <<<"$(extract_image_parts "AI_GATEWAY_IMAGE" "groot-community-ai-gateway")"
-
   local backup_file="$ENV_FILE.bak.${current}.before-update"
   cp "$ENV_FILE" "$backup_file"
 
-  local failed_step="rewrite image references"
-  set_value "GROOT_API_IMAGE" "${api_repo}:${latest}"
-  set_value "GROOT_UI_IMAGE" "${ui_repo}:${latest}"
-  set_value "AGENT_RUNTIME_IMAGE" "${runtime_repo}:${latest}"
-  set_value "AI_GATEWAY_IMAGE" "${gateway_repo}:${latest}"
+  local temp_dir preserve_dir release_root
+  temp_dir="$(mktemp -d)"
+  preserve_dir="$temp_dir/preserve"
+
+  local failed_step="download latest Community bundle"
+  release_root="$(download_release_bundle "$repo" "$latest" "$temp_dir")"
+
+  failed_step="self-update local Community bundle"
+  replace_bundle_from_release "$release_root" "$preserve_dir"
+
+  failed_step="refresh image references from updated bundle"
+  sync_image_refs_from_bundle
+
+  failed_step="refresh shipped first-party plugins"
+  refresh_firstparty_plugin_bundle "$preserve_dir/first_party_plugins.json"
 
   failed_step="pull new images"
   if ! compose pull; then
@@ -350,7 +566,7 @@ EOF
   fi
 
   failed_step="restart Community stack"
-  if ! compose up -d; then
+  if ! compose up -d --remove-orphans; then
     cat >&2 <<EOF
 Community update failed during: $failed_step
 Previous version: $current
@@ -397,6 +613,9 @@ EOF
     exit 1
   fi
 
+  if [[ -f "$BUNDLE_VERSION_FILE" ]]; then
+    echo "Bundle version: $(cat "$BUNDLE_VERSION_FILE")"
+  fi
   echo "Groot Community updated successfully."
   echo "Version: $current -> $latest"
   echo "Backup file: $backup_file"
@@ -426,8 +645,8 @@ Usage: groot <command>
 Commands:
   setup [--non-interactive]  Configure .env for the Community bundle
   start                      Start the Community stack in detached mode
-  stop                       Stop and remove the Community stack
-  restart                    Restart the Community stack
+  stop                       Stop the Community stack without removing data
+  restart                    Restart the Community stack without wiping data
   status                     Show Community stack status
   logs [service]             Tail logs for all services or one service
   migrate                    Apply pending SQL migrations from the bundle
@@ -450,18 +669,20 @@ case "$cmd" in
   start)
     ensure_env
     require_docker_compose
-    compose up -d
+    compose up -d --remove-orphans
     ;;
   stop)
     ensure_env
     require_docker_compose
-    compose down
+    compose stop
     ;;
   restart)
     ensure_env
     require_docker_compose
-    compose down
-    compose up -d
+    compose stop
+    compose up -d --remove-orphans
+    run_migrations
+    verify_stack_health
     ;;
   status)
     ensure_env

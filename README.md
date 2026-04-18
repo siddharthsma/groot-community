@@ -87,8 +87,8 @@ After setup, use the `groot` command directly.
 
 - `groot setup` updates `.env` and reruns the guided setup flow
 - `groot start` starts the full Community stack
-- `groot stop` stops and removes the stack containers
-- `groot restart` restarts the stack
+- `groot stop` stops the stack without removing containers or persistent data
+- `groot restart` restarts the stack without wiping persistent data and reapplies pending migrations
 - `groot status` shows current container status
 - `groot logs` tails logs for the whole stack or one service
 - `groot migrate` applies only pending bundled SQL migrations
@@ -96,11 +96,15 @@ After setup, use the `groot` command directly.
 - `groot integration build` builds a local plugin repo into this Community bundle
 - `groot integration verify` checks shipped and local plugin artifacts for this bundle
 - `groot update --check` shows your installed version and the latest Community release
-- `groot update` upgrades the bundle to the latest Community release
+- `groot update` self-updates the local bundle checkout to the latest Community release, refreshes shipped first-party plugins, updates images, reapplies migrations, and preserves `.env` plus runtime data
 
 The bundled migration runner is tracked and pending-only. On an existing local
 database created before the baseline reset, the first run records the baseline
 instead of replaying legacy SQL.
+
+Community runtime data is persisted across `groot stop`, `groot restart`, and
+`groot update`. PostgreSQL, Kafka, and the AI gateway state directory use named
+Docker volumes.
 
 ## Configuration
 
@@ -229,6 +233,8 @@ After updating:
 - sign in and verify the app loads normally
 - confirm the ingest endpoint in `Settings -> General` still matches your
   intended public API URL
+- local `.env`, installed integrations, plugin cache, and persisted database
+  state are preserved across the update
 
 If you ever need to recover manually after a failed update, restore the
 previous Community image references in `.env`, then run:
