@@ -1,11 +1,11 @@
-# Groot Community 0.1.14
+# Groot Community 0.1.15
 
 ## Published Images
 
-- `groot-community-api:0.1.14`
-- `groot-community-ui:0.1.14`
-- `groot-community-agent-runtime:0.1.14`
-- `groot-community-ai-gateway:0.1.14`
+- `groot-community-api:0.1.15`
+- `groot-community-ui:0.1.15`
+- `groot-community-agent-runtime:0.1.15`
+- `groot-community-ai-gateway:0.1.15`
 
 ## Shipped First-Party Plugins
 
@@ -42,9 +42,3 @@ groot update
 
 ## Changes
 
-- Improve community bundle persistence and self-update flow
-- Fix ElevenLabs integration and add live stack skill
-- Add integration wait event and plugin updates
-- Fix bootstrap tool inventory wiring
-- Add agent reasoning controls and skills foundation
-- Verify public community install in release pipeline

@@ -222,6 +222,15 @@ type StreamInboundSpec struct {
 	CapabilityText       string
 }
 
+type ToolExampleSpec struct {
+	ID          string
+	Title       string
+	Description string
+	RequestJSON json.RawMessage
+	Recommended bool
+	Notes       string
+}
+
 type OperationSpec struct {
 	Name             string
 	Description      string
@@ -230,6 +239,7 @@ type OperationSpec struct {
 	ParamsSchemaJSON json.RawMessage
 	ResultSchemaJSON json.RawMessage
 	AgentSafe        bool
+	Examples         []ToolExampleSpec
 }
 
 type AgentToolSpec struct {
@@ -240,6 +250,7 @@ type AgentToolSpec struct {
 	Operation       string
 	InputSchemaJSON json.RawMessage
 	WaitForReply    bool
+	Examples        []ToolExampleSpec
 }
 
 type SchemaSpec struct {
@@ -681,6 +692,7 @@ func LegacySpecToManifest(spec IntegrationSpec) Manifest {
 			ParamsSchemaJSON: cloneRawMessage(op.ParamsSchemaJSON),
 			ResultSchemaJSON: cloneRawMessage(op.ResultSchemaJSON),
 			AgentSafe:        op.AgentSafe,
+			Examples:         cloneToolExamples(op.Examples),
 		})
 	}
 
@@ -720,6 +732,7 @@ func ManifestToLegacySpec(manifest Manifest) IntegrationSpec {
 			ParamsSchemaJSON: cloneRawMessage(op.ParamsSchemaJSON),
 			ResultSchemaJSON: cloneRawMessage(op.ResultSchemaJSON),
 			AgentSafe:        op.AgentSafe,
+			Examples:         cloneToolExamples(op.Examples),
 		})
 	}
 
@@ -803,6 +816,9 @@ func validateAgentTools(integrationName string, tools []AgentToolSpec) error {
 			return fmt.Errorf("integration %s agent tool %s missing operation", integrationName, name)
 		}
 		if err := validateOptionalJSON(integrationName, "agent tool input schema", name, tool.InputSchemaJSON); err != nil {
+			return err
+		}
+		if err := validateToolExamples(integrationName, "agent tool", name, tool.Examples); err != nil {
 			return err
 		}
 		seen[name] = struct{}{}
@@ -979,10 +995,41 @@ func validateOperations(integrationName string, ops []OperationSpec) error {
 		if err := validateOptionalJSON(integrationName, "result schema", name, op.ResultSchemaJSON); err != nil {
 			return err
 		}
+		if err := validateToolExamples(integrationName, "operation", name, op.Examples); err != nil {
+			return err
+		}
 		if _, exists := seen[name]; exists {
 			return fmt.Errorf("integration %s has duplicate operation %s", integrationName, name)
 		}
 		seen[name] = struct{}{}
+	}
+	return nil
+}
+
+func validateToolExamples(integrationName string, ownerKind string, ownerName string, examples []ToolExampleSpec) error {
+	seen := make(map[string]struct{}, len(examples))
+	recommendedCount := 0
+	for _, example := range examples {
+		id := strings.TrimSpace(example.ID)
+		if id == "" {
+			return fmt.Errorf("integration %s %s %s has example with empty id", integrationName, ownerKind, ownerName)
+		}
+		if _, exists := seen[id]; exists {
+			return fmt.Errorf("integration %s %s %s has duplicate example %s", integrationName, ownerKind, ownerName, id)
+		}
+		if strings.TrimSpace(example.Title) == "" {
+			return fmt.Errorf("integration %s %s %s example %s missing title", integrationName, ownerKind, ownerName, id)
+		}
+		if len(example.RequestJSON) == 0 || !json.Valid(example.RequestJSON) {
+			return fmt.Errorf("integration %s %s %s example %s has invalid request json", integrationName, ownerKind, ownerName, id)
+		}
+		if example.Recommended {
+			recommendedCount++
+			if recommendedCount > 1 {
+				return fmt.Errorf("integration %s %s %s has multiple recommended examples", integrationName, ownerKind, ownerName)
+			}
+		}
+		seen[id] = struct{}{}
 	}
 	return nil
 }
@@ -1174,6 +1221,25 @@ func cloneAgentTools(specs []AgentToolSpec) []AgentToolSpec {
 			Operation:       spec.Operation,
 			InputSchemaJSON: cloneRawMessage(spec.InputSchemaJSON),
 			WaitForReply:    spec.WaitForReply,
+			Examples:        cloneToolExamples(spec.Examples),
+		})
+	}
+	return out
+}
+
+func cloneToolExamples(specs []ToolExampleSpec) []ToolExampleSpec {
+	if len(specs) == 0 {
+		return nil
+	}
+	out := make([]ToolExampleSpec, 0, len(specs))
+	for _, spec := range specs {
+		out = append(out, ToolExampleSpec{
+			ID:          spec.ID,
+			Title:       spec.Title,
+			Description: spec.Description,
+			RequestJSON: cloneRawMessage(spec.RequestJSON),
+			Recommended: spec.Recommended,
+			Notes:       spec.Notes,
 		})
 	}
 	return out
