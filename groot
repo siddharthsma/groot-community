@@ -467,7 +467,7 @@ verify_stack_health() {
   ui_port="${ui_port:-3000}"
 
   local api_url="http://127.0.0.1:${http_port}/readyz"
-  local ui_url="http://127.0.0.1:${ui_port}/login"
+  local ui_url="http://127.0.0.1:${ui_port}/"
   local attempt
 
   for attempt in {1..60}; do
@@ -644,10 +644,11 @@ Usage: groot <command>
 
 Commands:
   setup [--non-interactive]  Configure .env for the Community bundle
-  start                      Start the Community stack in detached mode
+  start                      Start the Community stack and wait for API/UI readiness
   stop                       Stop the Community stack without removing data
   restart                    Restart the Community stack without wiping data
   status                     Show Community stack status
+  verify                     Wait for API/UI readiness and exit non-zero on timeout
   logs [service]             Tail logs for all services or one service
   migrate                    Apply pending SQL migrations from the bundle
   integration init <name>    Scaffold a standalone integration plugin repository
@@ -670,6 +671,7 @@ case "$cmd" in
     ensure_env
     require_docker_compose
     compose up -d --remove-orphans
+    verify_stack_health
     ;;
   stop)
     ensure_env
@@ -688,6 +690,9 @@ case "$cmd" in
     ensure_env
     require_docker_compose
     compose ps
+    ;;
+  verify)
+    verify_stack_health
     ;;
   logs)
     ensure_env

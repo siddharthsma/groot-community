@@ -86,10 +86,11 @@ After setup, use the `groot` command directly.
 ## Commands
 
 - `groot setup` updates `.env` and reruns the guided setup flow
-- `groot start` starts the full Community stack
+- `groot start` starts the full Community stack and waits for the API plus UI root page to become ready
 - `groot stop` stops the stack without removing containers or persistent data
 - `groot restart` restarts the stack without wiping persistent data and reapplies pending migrations
 - `groot status` shows current container status
+- `groot verify` reruns the same API/UI readiness check and exits non-zero on timeout
 - `groot logs` tails logs for the whole stack or one service
 - `groot migrate` applies only pending bundled SQL migrations
 - `groot integration init` scaffolds a standalone integration plugin repository

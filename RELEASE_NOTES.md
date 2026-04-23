@@ -1,11 +1,11 @@
-# Groot Community 0.1.15
+# Groot Community 0.1.16
 
 ## Published Images
 
-- `groot-community-api:0.1.15`
-- `groot-community-ui:0.1.15`
-- `groot-community-agent-runtime:0.1.15`
-- `groot-community-ai-gateway:0.1.15`
+- `groot-community-api:0.1.16`
+- `groot-community-ui:0.1.16`
+- `groot-community-agent-runtime:0.1.16`
+- `groot-community-ai-gateway:0.1.16`
 
 ## Shipped First-Party Plugins
 
@@ -42,3 +42,4 @@ groot update
 
 ## Changes
 
+- Harden Community release health checks
